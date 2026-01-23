@@ -1,9 +1,10 @@
 name: smoke
 
 on:
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "0 2 * * *" # daily 02:00 UTC
 
 jobs:
   smoke:

@@ -38,4 +38,4 @@ jobs:
         run: uv run ruff check .
 
       - name: Import smoke
-        run: uv run python -c "import importlib; importlib.import_module('train'); importlib.import_module('eval'); importlib.import_module('tune')"
+        run: uv run python -c "import importlib; importlib.import_module('scripts.train'); importlib.import_module('scripts.eval'); importlib.import_module('scripts.tune')"
