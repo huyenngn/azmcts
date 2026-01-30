@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass
 
+import numpy as np
 import pyspiel
 
 from utils import utils
+
+# Type alias for opponent policy function: state -> action probabilities
+OpponentPolicy = Callable[[pyspiel.State], np.ndarray]
 
 
 @dataclass
@@ -33,6 +38,7 @@ class ParticleBeliefSampler:
         opp_tries_per_particle: int = 8,
         rebuild_max_tries: int = 200,
         seed: int = 0,
+        opponent_policy: OpponentPolicy | None = None,
     ):
         self.game = game
         self.ai_id = ai_id
@@ -40,9 +46,29 @@ class ParticleBeliefSampler:
         self.opp_tries_per_particle = opp_tries_per_particle
         self.rebuild_max_tries = rebuild_max_tries
         self.rng = random.Random(seed)
+        self.opponent_policy = opponent_policy
 
         self._history: list[_StepRecord] = []
         self._particles: list[pyspiel.State] = []
+
+    def _sample_opponent_action(self, state: pyspiel.State) -> int:
+        """Sample an opponent action, using policy if available."""
+        legal = state.legal_actions()
+        if not legal:
+            raise ValueError("No legal actions for opponent sampling")
+
+        if self.opponent_policy is None:
+            return self.rng.choice(legal)
+
+        # Sample from policy distribution over legal actions
+        probs = self.opponent_policy(state)
+        legal_probs = np.array([probs[a] for a in legal], dtype=np.float64)
+        legal_probs = np.maximum(legal_probs, 0.0)  # ensure non-negative
+        total = legal_probs.sum()
+        if total <= 0:
+            return self.rng.choice(legal)
+        legal_probs /= total  # renormalize
+        return self.rng.choices(legal, weights=legal_probs.tolist())[0]
 
     def _ai_obs(self, state: pyspiel.State) -> str:
         return state.observation_string(self.ai_id)
@@ -93,7 +119,7 @@ class ParticleBeliefSampler:
                 la = p3.legal_actions()
                 if not la:
                     break
-                a = self.rng.choice(la)
+                a = self._sample_opponent_action(p3)
                 p3.apply_action(a)
                 if self._ai_obs(p3) == rec.ai_obs_after:
                     updated.append(p3)
@@ -142,7 +168,7 @@ class ParticleBeliefSampler:
                         la = s2.legal_actions()
                         if not la:
                             break
-                        a = self.rng.choice(la)
+                        a = self._sample_opponent_action(s2)
                         s2.apply_action(a)
                         if self._ai_obs(s2) == rec.ai_obs_after:
                             s = s2
