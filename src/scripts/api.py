@@ -13,6 +13,7 @@ import argparse
 import enum
 import logging
 import pathlib
+import random
 import re
 import urllib.request
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from scripts.common.config import SamplerConfig, SearchConfig
 from scripts.common.seeding import derive_seed
 from utils import utils
 
-DEMO_MODEL_URL = "https://github.com/huyenngn/azbsmcts/releases/download/demo-model/demo_model.pt"
+DEMO_MODEL_URL = "https://github.com/huyenngn/azbsmcts/releases/download/demo-model/model.pt"
 DEFAULT_DEMO_MODEL_PATH = pathlib.Path("models/demo_model.pt")
 
 logging.basicConfig(level=logging.INFO)
@@ -35,9 +36,10 @@ logger = logging.getLogger("phantom_go_api")
 
 app = fastapi.FastAPI()
 
-# Hard constraints
 GAME_NAME = "phantom_go"
 GAME_PARAMS = {"board_size": 9}
+MAX_REPEATED_ACTION = 3
+PASS_ACTION = 81
 
 
 @dataclass
@@ -49,7 +51,6 @@ class ApiSettings:
     model_path: pathlib.Path
 
 
-# Global server state (single game at a time)
 app.state.settings = ApiSettings(
     seed=0,
     device="cpu",
@@ -184,6 +185,7 @@ def _build_agent(policy: str) -> None:
 def _play_ai_turns() -> list[PreviousMoveInfo]:
     """Execute all consecutive AI turns."""
     infos: list[PreviousMoveInfo] = []
+    recent_actions: list[int] = []
 
     while (
         app.state.state is not None
@@ -193,6 +195,22 @@ def _play_ai_turns() -> list[PreviousMoveInfo]:
         action = select_action(
             app.state.policy, app.state.agent, app.state.state, app.state.rng
         )
+
+        if (
+            action != PASS_ACTION
+            and recent_actions.count(action) >= MAX_REPEATED_ACTION
+        ):
+            logger.warning(
+                "AI stuck in loop (action %d repeated %d times), skipping action",
+                action,
+                recent_actions.count(action),
+            )
+            continue
+
+        recent_actions.append(action)
+        if len(recent_actions) > MAX_REPEATED_ACTION:
+            recent_actions.pop(0)
+
         logger.info("AI plays action %d", action)
         _apply_action(app.state.ai_id, action)
 
@@ -252,8 +270,6 @@ def start_game(request: StartGameRequest) -> GameStateResponse:
         game_idx=app.state.game_number,
         player_id=app.state.ai_id,
     )
-    # Use python's Random for random policy / tie-breaks
-    import random
 
     app.state.rng = random.Random(rng_seed)
 
