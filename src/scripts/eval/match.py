@@ -2,27 +2,18 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import datetime
 import pathlib
 import random
-from dataclasses import dataclass
-from datetime import datetime
 
 import pyspiel
 
-from scripts.common.agent_factory import make_agent, select_action
-from scripts.common.config import (
-    EvalConfig,
-    GameConfig,
-    SamplerConfig,
-    SearchConfig,
-    to_jsonable,
-)
-from scripts.common.io import write_json
-from scripts.common.seeding import derive_seed, get_repro_fingerprint
+from scripts.common import agent_factory, config, io, seeding
 from utils import utils
 
 
-@dataclass
+@dataclasses.dataclass
 class Result:
     games: int = 0
     p0_wins: int = 0
@@ -32,7 +23,7 @@ class Result:
     p1_return_sum: float = 0.0
 
 
-def update_result(res: Result, r0: float, r1: float):
+def update_result(res: Result, r0: float, r1: float) -> None:
     res.games += 1
     res.p0_return_sum += r0
     res.p1_return_sum += r1
@@ -49,8 +40,8 @@ def play_game(
     game: pyspiel.Game,
     kind0: str,
     kind1: str,
-    search_cfg: SearchConfig,
-    sampler_cfg: SamplerConfig,
+    search_cfg: config.SearchConfig,
+    sampler_cfg: config.SamplerConfig,
     seed: int,
     device: str,
     model_path: str,
@@ -58,11 +49,13 @@ def play_game(
     game_idx: int,
 ) -> tuple[float, float]:
     rng = random.Random(
-        derive_seed(seed, purpose="eval/rng", run_id=run_id, game_idx=game_idx)
+        seeding.derive_seed(
+            seed, purpose="eval/rng", run_id=run_id, game_idx=game_idx
+        )
     )
 
     state = game.new_initial_state()
-    a0, p0 = make_agent(
+    a0, p0 = agent_factory.make_agent(
         kind=kind0,
         player_id=0,
         game=game,
@@ -75,7 +68,7 @@ def play_game(
         model_path=model_path,
         game_idx=game_idx,
     )
-    a1, p1 = make_agent(
+    a1, p1 = agent_factory.make_agent(
         kind=kind1,
         player_id=1,
         game=game,
@@ -91,7 +84,7 @@ def play_game(
 
     while not state.is_terminal():
         actor = state.current_player()
-        action = select_action(
+        action = agent_factory.select_action(
             kind0 if actor == 0 else kind1,
             a0 if actor == 0 else a1,
             state,
@@ -114,8 +107,8 @@ def run_match(
     a: str,
     b: str,
     n: int,
-    search_cfg: SearchConfig,
-    sampler_cfg: SamplerConfig,
+    search_cfg: config.SearchConfig,
+    sampler_cfg: config.SamplerConfig,
     seed: int,
     device: str,
     model_path: str,
@@ -160,7 +153,7 @@ def run_match(
     return out
 
 
-def summarize(label: str, r: Result):
+def summarize(label: str, r: Result) -> None:
     p0_wr = r.p0_wins / max(1, r.games)
     p1_wr = r.p1_wins / max(1, r.games)
     dr = r.draws / max(1, r.games)
@@ -174,7 +167,7 @@ def summarize(label: str, r: Result):
     )
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", type=str, default="cpu")
@@ -202,22 +195,22 @@ def main():
 
     args = p.parse_args()
 
-    game_cfg = GameConfig.from_cli(args.game, args.game_params)
-    search_cfg = SearchConfig(
+    game_cfg = config.GameConfig.from_cli(args.game, args.game_params)
+    search_cfg = config.SearchConfig(
         T=args.T,
         S=args.S,
         c_puct=args.c_puct,
         dirichlet_alpha=args.dirichlet_alpha,
         dirichlet_weight=args.dirichlet_weight,
     )
-    sampler_cfg = SamplerConfig(
+    sampler_cfg = config.SamplerConfig(
         args.num_particles, args.opp_tries, args.rebuild_tries
     )
 
     game = pyspiel.load_game(game_cfg.name, game_cfg.params)
 
-    run_id = f"match_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    cfg = EvalConfig(
+    run_id = f"match_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    cfg = config.EvalConfig(
         seed=args.seed,
         device=args.device,
         game=game_cfg,
@@ -231,10 +224,10 @@ def main():
     )
 
     # Include reproducibility fingerprint in output
-    fingerprint = get_repro_fingerprint(args.device)
+    fingerprint = seeding.get_repro_fingerprint(args.device)
     payload = {
-        "timestamp": datetime.now().isoformat(timespec="seconds"),
-        "config": to_jsonable(cfg),
+        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+        "config": config.to_jsonable(cfg),
         "fingerprint": fingerprint.to_dict(),
         "results": [],
     }
@@ -273,7 +266,7 @@ def main():
     if args.out_json:
         outp = pathlib.Path(args.out_json)
         utils.ensure_dir(outp.parent)
-        write_json(outp, payload)
+        io.write_json(outp, payload)
         print(f"\nwrote: {outp}")
 
 

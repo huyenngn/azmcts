@@ -1,16 +1,13 @@
-# scripts/eval/sweep.py
 from __future__ import annotations
 
 import argparse
+import datetime
 import pathlib
-from datetime import datetime
 
 import pyspiel
 
-from scripts.common.config import GameConfig, SamplerConfig, SearchConfig
-from scripts.common.io import read_json, write_jsonl
-from scripts.common.seeding import derive_seed
-from scripts.eval.match import run_match
+from scripts.common import config, io, seeding
+from scripts.eval import match
 
 
 def az_winrate(res: dict, az_label: str = "azbsmcts") -> float:
@@ -53,7 +50,7 @@ def extract_games_from_checkpoint(path: pathlib.Path) -> int | None:
     return None
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", type=str, default="cpu")
@@ -82,15 +79,15 @@ def main():
 
     args = p.parse_args()
 
-    game_cfg = GameConfig.from_cli(args.game, args.game_params)
-    search_cfg = SearchConfig(
+    game_cfg = config.GameConfig.from_cli(args.game, args.game_params)
+    search_cfg = config.SearchConfig(
         T=args.T,
         S=args.S,
         c_puct=args.c_puct,
         dirichlet_alpha=args.dirichlet_alpha,
         dirichlet_weight=args.dirichlet_weight,
     )
-    sampler_cfg = SamplerConfig(
+    sampler_cfg = config.SamplerConfig(
         args.num_particles, args.opp_tries, args.rebuild_tries
     )
 
@@ -105,7 +102,7 @@ def main():
         return
 
     cfg_path = run_dir / "config.json"
-    cfg = read_json(cfg_path) if cfg_path.exists() else {}
+    cfg = io.read_json(cfg_path) if cfg_path.exists() else {}
 
     # Get total games from config for final model
     total_games = float("nan")
@@ -136,7 +133,7 @@ def main():
         return
 
     rows = []
-    sweep_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    sweep_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     for ckpt_path in checkpoints:
         # Determine games count for this checkpoint
@@ -147,7 +144,7 @@ def main():
         ckpt_id = ckpt_path.name
 
         # Evaluate vs BS-MCTS
-        res_b = run_match(
+        res_b = match.run_match(
             game=game,
             a="azbsmcts",
             b="bsmcts",
@@ -162,10 +159,10 @@ def main():
         wr_b = az_winrate(res_b)
 
         # Evaluate vs random
-        random_seed = derive_seed(
+        random_seed = seeding.derive_seed(
             args.seed, purpose="eval/sweep_random", extra=ckpt_id
         )
-        res_r = run_match(
+        res_r = match.run_match(
             game=game,
             a="azbsmcts",
             b="random",
@@ -193,7 +190,7 @@ def main():
         )
 
     out_path = run_dir / "eval_sweep.jsonl"
-    write_jsonl(out_path, rows)
+    io.write_jsonl(out_path, rows)
     print(f"Wrote {out_path}")
 
 

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import random
-from typing import Protocol
+import typing as t
 
-import pyspiel
+if t.TYPE_CHECKING:
+    import random
+
+    import pyspiel
 
 
-class DeterminizationSampler(Protocol):
+class DeterminizationSampler(t.Protocol):
     """Protocol for samplers that generate determinizations from belief states."""
 
     def sample(

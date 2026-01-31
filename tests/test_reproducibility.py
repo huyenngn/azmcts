@@ -12,50 +12,67 @@ from __future__ import annotations
 import pyspiel
 import pytest
 
-from agents import BSMCTSAgent
-from belief.samplers.particle import (
-    ParticleBeliefSampler,
-    ParticleDeterminizationSampler,
-)
-from scripts.common.seeding import derive_seed
+import agents
+from belief import samplers
+from scripts.common import seeding
 
 
 class TestDeriveSeed:
     """Tests for the derive_seed function."""
 
-    def test_deterministic_same_inputs(self):
+    def test_deterministic_same_inputs(self) -> None:
         """Same inputs should produce the same seed."""
-        seed1 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
-        seed2 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
+        seed1 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
+        seed2 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
         assert seed1 == seed2
 
-    def test_different_purpose_different_seed(self):
+    def test_different_purpose_different_seed(self) -> None:
         """Different purpose should produce different seeds."""
-        seed1 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
-        seed2 = derive_seed(42, purpose="eval/agent", game_idx=0, player_id=0)
+        seed1 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
+        seed2 = seeding.derive_seed(
+            42, purpose="eval/agent", game_idx=0, player_id=0
+        )
         assert seed1 != seed2
 
-    def test_different_game_idx_different_seed(self):
+    def test_different_game_idx_different_seed(self) -> None:
         """Different game_idx should produce different seeds."""
-        seed1 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
-        seed2 = derive_seed(42, purpose="train/agent", game_idx=1, player_id=0)
+        seed1 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
+        seed2 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=1, player_id=0
+        )
         assert seed1 != seed2
 
-    def test_different_player_id_different_seed(self):
+    def test_different_player_id_different_seed(self) -> None:
         """Different player_id should produce different seeds."""
-        seed1 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
-        seed2 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=1)
+        seed1 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
+        seed2 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=1
+        )
         assert seed1 != seed2
 
-    def test_different_base_seed_different_seed(self):
+    def test_different_base_seed_different_seed(self) -> None:
         """Different base seed should produce different seeds."""
-        seed1 = derive_seed(42, purpose="train/agent", game_idx=0, player_id=0)
-        seed2 = derive_seed(43, purpose="train/agent", game_idx=0, player_id=0)
+        seed1 = seeding.derive_seed(
+            42, purpose="train/agent", game_idx=0, player_id=0
+        )
+        seed2 = seeding.derive_seed(
+            43, purpose="train/agent", game_idx=0, player_id=0
+        )
         assert seed1 != seed2
 
-    def test_seed_is_32bit(self):
+    def test_seed_is_32bit(self) -> None:
         """Derived seed should be a 32-bit unsigned integer."""
-        seed = derive_seed(42, purpose="test")
+        seed = seeding.derive_seed(42, purpose="test")
         assert 0 <= seed < 2**32
 
 
@@ -63,19 +80,19 @@ class TestBSMCTSReproducibility:
     """Tests for BS-MCTS agent reproducibility."""
 
     @pytest.fixture
-    def game(self):
+    def game(self) -> pyspiel.Game:
         """Create a small phantom game for testing."""
         # Use phantom_ttt for faster tests
         return pyspiel.load_game("phantom_ttt")
 
     def _create_agent_with_seed(
         self, game: pyspiel.Game, player_id: int, seed: int
-    ) -> tuple[BSMCTSAgent, ParticleBeliefSampler]:
+    ) -> tuple[agents.BSMCTSAgent, samplers.ParticleBeliefSampler]:
         """Create a BS-MCTS agent with deterministic seeding."""
-        particle_seed = derive_seed(
+        particle_seed = seeding.derive_seed(
             seed, purpose="test/belief", game_idx=0, player_id=player_id
         )
-        particle = ParticleBeliefSampler(
+        particle = samplers.ParticleBeliefSampler(
             game=game,
             ai_id=player_id,
             num_particles=8,
@@ -83,13 +100,13 @@ class TestBSMCTSReproducibility:
             rebuild_max_tries=50,
             seed=particle_seed,
         )
-        agent_seed = derive_seed(
+        agent_seed = seeding.derive_seed(
             seed, purpose="test/agent", game_idx=0, player_id=player_id
         )
-        agent = BSMCTSAgent(
+        agent = agents.BSMCTSAgent(
             player_id=player_id,
             num_actions=game.num_distinct_actions(),
-            sampler=ParticleDeterminizationSampler(particle),
+            sampler=samplers.ParticleDeterminizationSampler(particle),
             T=4,  # Small T for fast tests
             S=2,
             seed=agent_seed,
@@ -121,7 +138,7 @@ class TestBSMCTSReproducibility:
 
         return actions, list(state.returns())
 
-    def test_same_seed_same_actions(self, game):
+    def test_same_seed_same_actions(self, game: pyspiel.Game) -> None:
         """Playing with the same seed should produce the same action sequence."""
         seed = 12345
         actions1, returns1 = self._play_game(game, seed)
@@ -130,7 +147,9 @@ class TestBSMCTSReproducibility:
         assert actions1 == actions2, "Action sequences should be identical"
         assert returns1 == returns2, "Returns should be identical"
 
-    def test_different_seed_likely_different_actions(self, game):
+    def test_different_seed_likely_different_actions(
+        self, game: pyspiel.Game
+    ) -> None:
         """Playing with different seeds should likely produce different actions."""
         actions1, _ = self._play_game(game, 12345)
         actions2, _ = self._play_game(game, 54321)
@@ -145,11 +164,10 @@ class TestBSMCTSReproducibility:
 class TestReproFingerprint:
     """Tests for reproducibility fingerprint."""
 
-    def test_fingerprint_has_required_fields(self):
+    def test_fingerprint_has_required_fields(self) -> None:
         """Fingerprint should contain all required fields."""
-        from scripts.common.seeding import get_repro_fingerprint
 
-        fp = get_repro_fingerprint("cpu")
+        fp = seeding.get_repro_fingerprint("cpu")
         d = fp.to_dict()
 
         assert "python_version" in d
@@ -157,13 +175,11 @@ class TestReproFingerprint:
         assert "torch_version" in d
         assert "git_commit" in d
 
-    def test_fingerprint_to_json(self):
+    def test_fingerprint_to_json(self) -> None:
         """Fingerprint should serialize to valid JSON."""
         import json
 
-        from scripts.common.seeding import get_repro_fingerprint
-
-        fp = get_repro_fingerprint("cpu")
+        fp = seeding.get_repro_fingerprint("cpu")
         json_str = fp.to_json()
 
         # Should not raise
@@ -174,30 +190,26 @@ class TestReproFingerprint:
 class TestSetGlobalSeeds:
     """Tests for set_global_seeds function."""
 
-    def test_set_global_seeds_determinism(self):
+    def test_set_global_seeds_determinism(self) -> None:
         """Global seeds should produce deterministic numpy random."""
         import numpy as np
 
-        from scripts.common.seeding import set_global_seeds
-
-        set_global_seeds(42, deterministic_torch=False, log=False)
+        seeding.set_global_seeds(42, deterministic_torch=False, log=False)
         vals1 = np.random.rand(5).tolist()
 
-        set_global_seeds(42, deterministic_torch=False, log=False)
+        seeding.set_global_seeds(42, deterministic_torch=False, log=False)
         vals2 = np.random.rand(5).tolist()
 
         assert vals1 == vals2
 
-    def test_set_global_seeds_torch_determinism(self):
+    def test_set_global_seeds_torch_determinism(self) -> None:
         """Global seeds should produce deterministic torch random."""
         import torch
 
-        from scripts.common.seeding import set_global_seeds
-
-        set_global_seeds(42, deterministic_torch=False, log=False)
+        seeding.set_global_seeds(42, deterministic_torch=False, log=False)
         vals1 = torch.rand(5).tolist()
 
-        set_global_seeds(42, deterministic_torch=False, log=False)
+        seeding.set_global_seeds(42, deterministic_torch=False, log=False)
         vals2 = torch.rand(5).tolist()
 
         assert vals1 == vals2

@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import math
+import typing as t
 
-import pyspiel
-
-from agents.base import BaseAgent
-from belief.samplers.base import DeterminizationSampler
-from belief.tree import BeliefTree, EdgeStats, Node
+import agents
+from belief import samplers, tree
 from utils import utils
 
+if t.TYPE_CHECKING:
+    import pyspiel
 
-class BSMCTSAgent(BaseAgent):
-    """
-    Belief-State Monte Carlo Tree Search agent.
+
+class BSMCTSAgent(agents.BaseAgent):
+    """Belief-State Monte Carlo Tree Search agent.
 
     Uses determinization sampling to handle imperfect information.
     Does not use learned priors; relies on UCT for exploration.
@@ -22,7 +22,7 @@ class BSMCTSAgent(BaseAgent):
         self,
         player_id: int,
         num_actions: int,
-        sampler: DeterminizationSampler,
+        sampler: samplers.DeterminizationSampler,
         c_uct: float = 1.4,
         T: int = 64,
         S: int = 8,
@@ -32,7 +32,7 @@ class BSMCTSAgent(BaseAgent):
         super().__init__(
             player_id=player_id, num_actions=num_actions, seed=seed
         )
-        self.tree = BeliefTree()
+        self.tree = tree.BeliefTree()
         self.sampler = sampler
         self.c_uct = float(c_uct)
         self.T = int(T)
@@ -55,14 +55,14 @@ class BSMCTSAgent(BaseAgent):
 
         return root.get_most_visited_action()
 
-    def _expand(self, node: Node, state: pyspiel.State):
+    def _expand(self, node: tree.Node, state: pyspiel.State) -> None:
         """Initialize node edges for all legal actions."""
         node.is_expanded = True
         node.legal_actions = list(state.legal_actions())
         for a in node.legal_actions:
-            node.edges.setdefault(a, EdgeStats())
+            node.edges.setdefault(a, tree.EdgeStats())
 
-    def _uct(self, parent: Node, edge: EdgeStats) -> float:
+    def _uct(self, parent: tree.Node, edge: tree.EdgeStats) -> float:
         q = edge.q
         u = self.c_uct * math.sqrt(math.log(parent.n + 1.0) / (edge.n + 1.0))
         return q + u

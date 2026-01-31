@@ -1,5 +1,4 @@
-"""
-Centralized seed derivation for reproducibility.
+"""Centralized seed derivation for reproducibility.
 
 All stochastic operations should derive their seeds from a base_seed via
 derive_seed() with appropriate namespacing to ensure:
@@ -25,13 +24,17 @@ Usage:
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import platform
+import random
 import subprocess
 import sys
-from dataclasses import dataclass
-from typing import Any
+import typing as t
+
+import numpy as np
+import torch
 
 _UINT32_MASK = 0xFFFFFFFF
 
@@ -52,8 +55,7 @@ def derive_seed(
     player_id: int | None = None,
     extra: str = "",
 ) -> int:
-    """
-    Deterministic seed derivation with namespacing.
+    """Deterministic seed derivation with namespacing.
 
     Uses blake2b hashing to mix all parameters into a 32-bit seed.
     Same inputs -> same seed; different purpose/ids -> different seed.
@@ -67,7 +69,8 @@ def derive_seed(
         player_id: Player identifier (0 or 1).
         extra: Additional differentiator string.
 
-    Returns:
+    Returns
+    -------
         32-bit unsigned integer seed.
     """
     key = (
@@ -81,6 +84,7 @@ def _get_git_commit() -> str | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
+            check=False,
             capture_output=True,
             text=True,
             timeout=5,
@@ -97,6 +101,7 @@ def _get_git_dirty() -> bool | None:
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
+            check=False,
             capture_output=True,
             text=True,
             timeout=5,
@@ -108,7 +113,7 @@ def _get_git_dirty() -> bool | None:
     return None
 
 
-@dataclass
+@dataclasses.dataclass
 class ReproFingerprint:
     """Environment fingerprint for reproducibility tracking."""
 
@@ -121,7 +126,7 @@ class ReproFingerprint:
     git_commit: str | None
     git_dirty: bool | None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, t.Any]:
         return {
             "python_version": self.python_version,
             "platform": self.platform,
@@ -138,13 +143,13 @@ class ReproFingerprint:
 
 
 def get_repro_fingerprint(device: str = "cpu") -> ReproFingerprint:
-    """
-    Collect environment fingerprint for reproducibility logging.
+    """Collect environment fingerprint for reproducibility logging.
 
     Args:
         device: PyTorch device string (e.g., "cpu", "cuda:0").
 
-    Returns:
+    Returns
+    -------
         ReproFingerprint with system and library versions.
     """
     torch_version: str | None = None
@@ -153,8 +158,6 @@ def get_repro_fingerprint(device: str = "cpu") -> ReproFingerprint:
     device_name: str | None = None
 
     try:
-        import torch
-
         torch_version = torch.__version__
         if torch.cuda.is_available():
             cuda_version = torch.version.cuda
@@ -204,8 +207,7 @@ def set_global_seeds(
     deterministic_torch: bool = False,
     log: bool = True,
 ) -> None:
-    """
-    Set global random seeds for reproducibility.
+    """Set global random seeds for reproducibility.
 
     This sets seeds for:
       - random.seed(seed)
@@ -223,10 +225,6 @@ def set_global_seeds(
         deterministic_torch: Enable extra determinism flags (may hurt performance).
         log: Print a summary of what was set.
     """
-    import random
-
-    import numpy as np
-    import torch
 
     random.seed(seed)
     np.random.seed(seed)

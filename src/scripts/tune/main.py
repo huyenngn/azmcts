@@ -1,22 +1,21 @@
 import argparse
+import datetime
 import json
 import pathlib
-from datetime import datetime
 
 import numpy as np
 import optuna
 import pyspiel
 import torch
 
-from nets.tiny_policy_value import TinyPolicyValueNet
-from scripts.common.config import SamplerConfig, SearchConfig
-from scripts.common.seeding import derive_seed, set_global_seeds
-from scripts.eval.match import run_match
-from scripts.train.main import self_play, train_net
+import nets
+from scripts import train
+from scripts.common import config, seeding
+from scripts.eval import match
 from utils import utils
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--trials", type=int, default=25)
     parser.add_argument("--seed", type=int, default=0)
@@ -37,7 +36,7 @@ def main():
     args = parser.parse_args()
 
     utils.ensure_dir(pathlib.Path("runs"))
-    set_global_seeds(args.seed, deterministic_torch=False, log=True)
+    seeding.set_global_seeds(args.seed, deterministic_torch=False, log=True)
 
     game = pyspiel.load_game("phantom_go", {"board_size": args.board})
     num_actions = game.num_distinct_actions()
@@ -62,7 +61,7 @@ def main():
         # Belief sampler parameters
         num_particles = trial.suggest_int("num_particles", 10, 64, log=True)
 
-        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         run_dir = pathlib.Path("runs") / f"{ts}_trial{trial.number:04d}"
         utils.ensure_dir(run_dir)
 
@@ -83,21 +82,21 @@ def main():
         with (run_dir / "config.json").open("w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
 
-        net = TinyPolicyValueNet(
+        net = nets.TinyPolicyValueNet(
             obs_size=game.observation_tensor_size(),
             num_actions=num_actions,
             hidden=FIXED_HIDDEN,
         ).to(args.device)
 
         # Create config objects for this trial
-        search_cfg = SearchConfig(
+        search_cfg = config.SearchConfig(
             T=T,
             S=S,
             c_puct=c_puct,
             dirichlet_alpha=dirichlet_alpha,
             dirichlet_weight=0.25,  # Fixed, only alpha is tuned
         )
-        sampler_cfg = SamplerConfig(
+        sampler_cfg = config.SamplerConfig(
             num_particles=num_particles,
             opp_tries_per_particle=8,
             rebuild_max_tries=200,
@@ -105,10 +104,10 @@ def main():
         run_id = f"trial{trial.number:04d}"
 
         # Derive seeds deterministically for each trial
-        selfplay_seed = derive_seed(
+        selfplay_seed = seeding.derive_seed(
             args.seed, purpose="tune/selfplay", extra=str(trial.number)
         )
-        examples, p0rets = self_play(
+        examples, p0rets = train.self_play(
             game=game,
             net=net,
             num_games=args.games,
@@ -121,10 +120,10 @@ def main():
         )
 
         metrics_path = run_dir / "train_metrics.jsonl"
-        sgd_seed = derive_seed(
+        sgd_seed = seeding.derive_seed(
             args.seed, purpose="tune/sgd", extra=str(trial.number)
         )
-        train_net(
+        train.train_net(
             net=net,
             examples=examples,
             epochs=args.epochs,
@@ -139,10 +138,10 @@ def main():
         torch.save(net.state_dict(), str(model_path))
 
         # Evaluate vs baseline with deterministically derived seed
-        eval_seed = derive_seed(
+        eval_seed = seeding.derive_seed(
             args.seed, purpose="tune/eval", extra=str(trial.number)
         )
-        res = run_match(
+        res = match.run_match(
             game=game,
             a="azbsmcts",
             b="bsmcts",

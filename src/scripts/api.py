@@ -1,5 +1,4 @@
-"""
-Phantom Go API backend (single game at a time).
+"""Phantom Go API backend (single game at a time).
 
 Constraints (by design):
 - Only supports OpenSpiel "phantom_go" on 9x9 board.
@@ -10,22 +9,21 @@ Constraints (by design):
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import enum
 import logging
 import pathlib
 import random
 import re
-import urllib.request
-from dataclasses import dataclass
+import typing as t
+from urllib import request
 
 import fastapi
 import pydantic
 import pyspiel
 import uvicorn
 
-from scripts.common.agent_factory import make_agent, select_action
-from scripts.common.config import SamplerConfig, SearchConfig
-from scripts.common.seeding import derive_seed
+from scripts.common import agent_factory, config, seeding
 from utils import utils
 
 DEMO_MODEL_URL = "https://github.com/huyenngn/azbsmcts/releases/download/demo-model/model.pt"
@@ -42,22 +40,22 @@ MAX_REPEATED_ACTION = 3
 PASS_ACTION = 81
 
 
-@dataclass
+@dataclasses.dataclass
 class ApiSettings:
     seed: int
     device: str
-    search_cfg: SearchConfig
-    sampler_cfg: SamplerConfig
+    search_cfg: config.SearchConfig
+    sampler_cfg: config.SamplerConfig
     model_path: pathlib.Path
 
 
 app.state.settings = ApiSettings(
     seed=0,
     device="cpu",
-    search_cfg=SearchConfig(
+    search_cfg=config.SearchConfig(
         T=4, S=2, c_puct=1.5, dirichlet_alpha=0.0, dirichlet_weight=0.0
     ),
-    sampler_cfg=SamplerConfig(
+    sampler_cfg=config.SamplerConfig(
         num_particles=32, opp_tries_per_particle=8, rebuild_max_tries=200
     ),
     model_path=DEFAULT_DEMO_MODEL_PATH,
@@ -112,11 +110,11 @@ def _ensure_model(path: pathlib.Path) -> str:
 
     logger.info("Downloading demo model to %s", path)
     try:
-        urllib.request.urlretrieve(DEMO_MODEL_URL, str(path))
+        request.urlretrieve(DEMO_MODEL_URL, str(path))
     except Exception as e:
         raise fastapi.HTTPException(
             status_code=500, detail=f"Failed to download demo model: {e}"
-        )
+        ) from e
     return str(path)
 
 
@@ -164,7 +162,7 @@ def _build_agent(policy: str) -> None:
     if policy == "azbsmcts":
         model_path = _ensure_model(settings.model_path)
 
-    agent, particle = make_agent(
+    agent, particle = agent_factory.make_agent(
         kind=policy,
         player_id=app.state.ai_id,
         game=app.state.game,
@@ -186,15 +184,23 @@ def _play_ai_turns() -> list[PreviousMoveInfo]:
     """Execute all consecutive AI turns."""
     infos: list[PreviousMoveInfo] = []
     recent_actions: list[int] = []
+    tried_actions: set[int] = set()
 
     while (
         app.state.state is not None
         and not app.state.state.is_terminal()
         and app.state.state.current_player() == app.state.ai_id
     ):
-        action = select_action(
+        action = agent_factory.select_action(
             app.state.policy, app.state.agent, app.state.state, app.state.rng
         )
+
+        if action in tried_actions:
+            logger.info(
+                "AI already tried action %d and failed, selecting again",
+                action,
+            )
+            continue
 
         if (
             action != PASS_ACTION
@@ -205,6 +211,7 @@ def _play_ai_turns() -> list[PreviousMoveInfo]:
                 action,
                 recent_actions.count(action),
             )
+            tried_actions.add(action)
             continue
 
         recent_actions.append(action)
@@ -235,7 +242,7 @@ def _response(move_infos: list[PreviousMoveInfo]) -> GameStateResponse:
 
 
 @app.get("/")
-def root():
+def root() -> dict[str, t.Any]:
     return {
         "name": "Phantom Go API",
         "active_game": app.state.state is not None
@@ -263,7 +270,7 @@ def start_game(request: StartGameRequest) -> GameStateResponse:
     app.state.policy = request.policy
 
     settings: ApiSettings = app.state.settings
-    rng_seed = derive_seed(
+    rng_seed = seeding.derive_seed(
         settings.seed,
         purpose="api/rng",
         run_id="api",
@@ -318,23 +325,22 @@ def step(request: MakeMoveRequest) -> GameStateResponse:
     return _response(infos)
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--host", type=str, default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
 
-    # Explicit (no env vars)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", type=str, default="cpu")
 
-    # Search knobs (API defaults intentionally small)
+    # Search (API defaults intentionally small)
     p.add_argument("--T", type=int, default=4)
     p.add_argument("--S", type=int, default=2)
     p.add_argument("--c-puct", type=float, default=1.5)
     p.add_argument("--dirichlet-alpha", type=float, default=0.0)
     p.add_argument("--dirichlet-weight", type=float, default=0.0)
 
-    # Particle sampler knobs
+    # Particle sampler
     p.add_argument("--num-particles", type=int, default=32)
     p.add_argument("--opp-tries", type=int, default=8)
     p.add_argument("--rebuild-tries", type=int, default=200)
@@ -349,14 +355,14 @@ def main():
     app.state.settings = ApiSettings(
         seed=args.seed,
         device=args.device,
-        search_cfg=SearchConfig(
+        search_cfg=config.SearchConfig(
             T=args.T,
             S=args.S,
             c_puct=args.c_puct,
             dirichlet_alpha=args.dirichlet_alpha,
             dirichlet_weight=args.dirichlet_weight,
         ),
-        sampler_cfg=SamplerConfig(
+        sampler_cfg=config.SamplerConfig(
             num_particles=args.num_particles,
             opp_tries_per_particle=args.opp_tries,
             rebuild_max_tries=args.rebuild_tries,

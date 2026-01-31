@@ -1,4 +1,3 @@
-# scripts/train/main.py
 from __future__ import annotations
 
 import argparse
@@ -8,26 +7,11 @@ import pathlib
 import numpy as np
 import pyspiel
 import torch
-import torch.nn.functional as F
+from torch.nn import functional as F
 
-from agents.base import PolicyTargetMixin
-from nets.tiny_policy_value import TinyPolicyValueNet
-from scripts.common.agent_factory import make_agent
-from scripts.common.config import (
-    GameConfig,
-    SamplerConfig,
-    SearchConfig,
-    TrainBudget,
-    TrainConfig,
-    to_jsonable,
-)
-from scripts.common.io import make_run_dir, write_json
-from scripts.common.seeding import (
-    derive_seed,
-    get_repro_fingerprint,
-    log_repro_fingerprint,
-    set_global_seeds,
-)
+import agents
+import nets
+from scripts.common import agent_factory, config, io, seeding
 from utils import utils
 
 
@@ -47,9 +31,9 @@ class Example:
 def self_play_one_game(
     *,
     game: pyspiel.Game,
-    net: TinyPolicyValueNet,
-    search_cfg: SearchConfig,
-    sampler_cfg: SamplerConfig,
+    net: nets.TinyPolicyValueNet,
+    search_cfg: config.SearchConfig,
+    sampler_cfg: config.SamplerConfig,
     base_seed: int,
     device: str,
     temperature: float,
@@ -59,7 +43,7 @@ def self_play_one_game(
     """Play a single self-play game and return examples + player 0 return."""
     state = game.new_initial_state()
 
-    a0, p0 = make_agent(
+    a0, p0 = agent_factory.make_agent(
         kind="azbsmcts",
         player_id=0,
         game=game,
@@ -73,7 +57,7 @@ def self_play_one_game(
         net=net,
         game_idx=game_idx,
     )
-    a1, p1 = make_agent(
+    a1, p1 = agent_factory.make_agent(
         kind="azbsmcts",
         player_id=1,
         game=game,
@@ -88,13 +72,13 @@ def self_play_one_game(
         game_idx=game_idx,
     )
 
-    if a0 is None or a1 is None or p0 is None or p1 is None:
-        raise ValueError("self-play agents must be non-random")
-
-    if not isinstance(a0, PolicyTargetMixin) or not isinstance(
-        a1, PolicyTargetMixin
+    if (
+        p0 is None
+        or p1 is None
+        or not isinstance(a0, agents.AZBSMCTSAgent)
+        or not isinstance(a1, agents.AZBSMCTSAgent)
     ):
-        raise TypeError("self-play requires agents with select_action_with_pi")
+        raise ValueError("AZ-BSMCTS agents required for self-play")
 
     traj: list[tuple[np.ndarray, np.ndarray, int]] = []
 
@@ -130,10 +114,10 @@ def self_play_one_game(
 def self_play(
     *,
     game: pyspiel.Game,
-    net: TinyPolicyValueNet,
+    net: nets.TinyPolicyValueNet,
     num_games: int,
-    search_cfg: SearchConfig,
-    sampler_cfg: SamplerConfig,
+    search_cfg: config.SearchConfig,
+    sampler_cfg: config.SamplerConfig,
     base_seed: int,
     device: str,
     temperature: float,
@@ -163,7 +147,7 @@ def self_play(
 
 def train_net(
     *,
-    net: TinyPolicyValueNet,
+    net: nets.TinyPolicyValueNet,
     examples: list[Example],
     epochs: int,
     batch_size: int,
@@ -171,7 +155,7 @@ def train_net(
     device: str,
     seed: int,
     metrics_path: pathlib.Path,
-):
+) -> None:
     rng = np.random.default_rng(seed)
     opt = torch.optim.Adam(net.parameters(), lr=lr)
     net.train()
@@ -230,7 +214,7 @@ def train_net(
     net.eval()
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--device", type=str, default="cpu")
@@ -268,29 +252,29 @@ def main():
     args = p.parse_args()
 
     # Set global seeds and log determinism mode
-    set_global_seeds(
+    seeding.set_global_seeds(
         args.seed, deterministic_torch=args.deterministic_torch, log=True
     )
-    log_repro_fingerprint(args.device)
+    seeding.log_repro_fingerprint(args.device)
 
-    game_cfg = GameConfig.from_cli(args.game, args.game_params)
-    search_cfg = SearchConfig(
+    game_cfg = config.GameConfig.from_cli(args.game, args.game_params)
+    search_cfg = config.SearchConfig(
         T=args.T,
         S=args.S,
         c_puct=args.c_puct,
         dirichlet_alpha=args.dirichlet_alpha,
         dirichlet_weight=args.dirichlet_weight,
     )
-    sampler_cfg = SamplerConfig(
+    sampler_cfg = config.SamplerConfig(
         num_particles=args.num_particles,
         opp_tries_per_particle=args.opp_tries,
         rebuild_max_tries=args.rebuild_tries,
     )
 
-    run = make_run_dir(args.runs_root, args.run_name, args.seed)
+    run = io.make_run_dir(args.runs_root, args.run_name, args.seed)
     run_id = run.run_dir.name
 
-    cfg = TrainConfig(
+    cfg = config.TrainConfig(
         seed=args.seed,
         device=args.device,
         deterministic_torch=args.deterministic_torch,
@@ -298,7 +282,7 @@ def main():
         out_model_path=args.out_model,
         game=game_cfg,
         search=search_cfg,
-        budget=TrainBudget(
+        budget=config.TrainBudget(
             games=args.games, epochs=args.epochs, batch=args.batch
         ),
         lr=args.lr,
@@ -307,15 +291,15 @@ def main():
     )
 
     # Write config with reproducibility fingerprint
-    fingerprint = get_repro_fingerprint(args.device)
+    fingerprint = seeding.get_repro_fingerprint(args.device)
     config_payload = {
-        "config": to_jsonable(cfg),
+        "config": config.to_jsonable(cfg),
         "fingerprint": fingerprint.to_dict(),
     }
-    write_json(run.config_path, config_payload)
+    io.write_json(run.config_path, config_payload)
 
     game = pyspiel.load_game(game_cfg.name, game_cfg.params)
-    net = TinyPolicyValueNet(
+    net = nets.TinyPolicyValueNet(
         obs_size=game.observation_tensor_size(),
         num_actions=game.num_distinct_actions(),
     ).to(args.device)
@@ -371,7 +355,7 @@ def main():
             batch_size=args.batch,
             lr=args.lr,
             device=args.device,
-            seed=derive_seed(
+            seed=seeding.derive_seed(
                 args.seed,
                 purpose="train/sgd",
                 run_id=run_id,

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
+import dataclasses
+import pathlib
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+from torch.nn import functional as F
 
 
 class TinyPolicyValueNet(nn.Module):
@@ -22,7 +22,7 @@ class TinyPolicyValueNet(nn.Module):
         self.policy = nn.Linear(hidden, num_actions)
         self.value = nn.Linear(hidden, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass returning (policy_logits, value)."""
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
@@ -31,7 +31,7 @@ class TinyPolicyValueNet(nn.Module):
         return logits, v
 
 
-@dataclass
+@dataclasses.dataclass
 class _AZShared:
     net: TinyPolicyValueNet | None = None
     device: str | None = None
@@ -63,7 +63,8 @@ def get_shared_az_model(
         model_path: Path to the model weights file.
         device: Device to load the model on (default: "cpu").
 
-    Returns:
+    Returns
+    -------
         A shared TinyPolicyValueNet instance.
     """
     if (
@@ -80,7 +81,7 @@ def get_shared_az_model(
     )
     net.eval()
 
-    p = Path(model_path)
+    p = pathlib.Path(model_path)
     if p.exists():
         state_dict = torch.load(str(p), map_location=device)
         net.load_state_dict(state_dict)

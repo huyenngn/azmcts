@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+import dataclasses
 import json
-from dataclasses import asdict, dataclass
-from typing import Any
+import typing as t
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class GameConfig:
     name: str
-    params: dict[str, Any]
+    params: dict[str, t.Any]
 
     @staticmethod
-    def from_cli(game: str, game_params_json: str) -> "GameConfig":
+    def from_cli(game: str, game_params_json: str) -> GameConfig:
         params = {}
         if game_params_json:
             params = json.loads(game_params_json)
@@ -20,7 +20,7 @@ class GameConfig:
         return GameConfig(name=game, params=params)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SearchConfig:
     T: int
     S: int
@@ -29,21 +29,21 @@ class SearchConfig:
     dirichlet_weight: float
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class SamplerConfig:
     num_particles: int
     opp_tries_per_particle: int
     rebuild_max_tries: int
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class TrainBudget:
     games: int
     epochs: int
     batch: int
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class TrainConfig:
     seed: int
     device: str
@@ -58,7 +58,7 @@ class TrainConfig:
     sampler: SamplerConfig
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class EvalConfig:
     seed: int
     device: str
@@ -72,7 +72,7 @@ class EvalConfig:
     model_path: str
 
 
-def to_jsonable(obj: Any) -> Any:
+def to_jsonable(obj: t.Any) -> t.Any:
     if hasattr(obj, "__dataclass_fields__"):
-        return asdict(obj)
+        return dataclasses.asdict(obj)
     return obj

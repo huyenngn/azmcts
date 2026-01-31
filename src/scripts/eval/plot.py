@@ -1,4 +1,3 @@
-# scripts/eval/plot.py
 from __future__ import annotations
 
 import argparse
@@ -7,10 +6,10 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from scripts.common.io import read_jsonl
+from scripts.common import io
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--run-dir",
@@ -29,7 +28,7 @@ def main():
         print("Run 'eval-sweep --run-dir <run>' first.")
         return
 
-    rows = read_jsonl(inp)
+    rows = io.read_jsonl(inp)
     if not rows:
         print(f"No rows in {inp}")
         return

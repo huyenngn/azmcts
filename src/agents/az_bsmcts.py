@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple
+import typing as t
 
 import numpy as np
-import pyspiel
 import torch
 
-from agents.base import BaseAgent, PolicyTargetMixin
-from belief.samplers.base import DeterminizationSampler
-from belief.tree import BeliefTree, EdgeStats, Node
-from nets.tiny_policy_value import TinyPolicyValueNet, get_shared_az_model
-from utils import utils
-from utils.softmax import softmax_np
+import nets
+from agents import base
+from belief import samplers, tree
+from utils import softmax, utils
+
+if t.TYPE_CHECKING:
+    import pyspiel
 
 
-class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
-    """
-    AlphaZero-guided Belief-State MCTS agent.
+class AZBSMCTSAgent(base.BaseAgent, base.PolicyTargetMixin):
+    """AlphaZero-guided Belief-State MCTS agent.
 
     Uses neural network priors and values with PUCT selection.
     All observations use explicit player IDs to prevent information leakage.
@@ -28,21 +27,21 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         player_id: int,
         num_actions: int,
         obs_size: int,
-        sampler: DeterminizationSampler,
+        sampler: samplers.DeterminizationSampler,
         c_puct: float = 1.5,
         T: int = 64,
         S: int = 8,
         seed: int = 0,
         device: str = "cpu",
-        net: Optional[TinyPolicyValueNet] = None,
-        model_path: Optional[str] = None,
+        net: nets.TinyPolicyValueNet | None = None,
+        model_path: str | None = None,
         dirichlet_alpha: float = 0.03,
         dirichlet_weight: float = 0.25,
     ):
         super().__init__(
             player_id=player_id, num_actions=num_actions, seed=seed
         )
-        self.tree = BeliefTree()
+        self.tree = tree.BeliefTree()
         self.sampler = sampler
         self.c_puct = float(c_puct)
         self.T = int(T)
@@ -56,7 +55,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
                 raise ValueError(
                     "Either 'net' or 'model_path' must be provided"
                 )
-            self.net = get_shared_az_model(
+            self.net = nets.get_shared_az_model(
                 obs_size=obs_size,
                 num_actions=num_actions,
                 model_path=model_path,
@@ -79,8 +78,11 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         return torch.from_numpy(obs).to(self.device)
 
     def _expand(
-        self, node: Node, state: pyspiel.State, add_dirichlet: bool = False
-    ):
+        self,
+        node: tree.Node,
+        state: pyspiel.State,
+        add_dirichlet: bool = False,
+    ) -> None:
         """Expand node and initialize edges with network priors.
 
         Args:
@@ -91,7 +93,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         node.is_expanded = True
         node.legal_actions = list(state.legal_actions())
         for a in node.legal_actions:
-            node.edges.setdefault(a, EdgeStats())
+            node.edges.setdefault(a, tree.EdgeStats())
 
         with torch.no_grad():
             x = self._state_tensor_side_to_move(state).unsqueeze(0)
@@ -101,7 +103,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         mask = np.full((self.num_actions,), -1e9, dtype=np.float32)
         for a in node.legal_actions:
             mask[a] = 0.0
-        priors = softmax_np(logits + mask)
+        priors = softmax.softmax_np(logits + mask)
 
         # Add Dirichlet noise at root for exploration (standard AlphaZero)
         if add_dirichlet and self.dirichlet_alpha > 0:
@@ -126,7 +128,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
             v_cur = float(v.item())
         return v_cur if state.current_player() == self.player_id else -v_cur
 
-    def _puct(self, parent: Node, edge: EdgeStats) -> float:
+    def _puct(self, parent: tree.Node, edge: tree.EdgeStats) -> float:
         q = edge.q
         u = self.c_puct * edge.p * math.sqrt(parent.n + 1.0) / (1.0 + edge.n)
         return q + u
@@ -167,7 +169,9 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         edge.w += v_root
         return v_root
 
-    def _root_visit_policy(self, root: Node, temperature: float) -> np.ndarray:
+    def _root_visit_policy(
+        self, root: tree.Node, temperature: float
+    ) -> np.ndarray:
         pi = np.zeros((self.num_actions,), dtype=np.float32)
         if not root.edges:
             return pi
@@ -181,7 +185,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
 
         vt = np.power(visits + 1e-8, 1.0 / float(temperature))
         probs = vt / float(np.sum(vt))
-        for a, p in zip(actions, probs):
+        for a, p in zip(actions, probs, strict=False):
             pi[a] = float(p)
         return pi
 
@@ -197,7 +201,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
 
     def select_action_with_pi(
         self, state: pyspiel.State, temperature: float = 1.0
-    ) -> Tuple[int, np.ndarray]:
+    ) -> tuple[int, np.ndarray]:
         """Select action with policy vector for training.
 
         Used during self-play. Adds Dirichlet noise and samples from visits.
@@ -211,7 +215,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         state: pyspiel.State,
         temperature: float,
         add_dirichlet: bool,
-    ) -> Tuple[int, np.ndarray]:
+    ) -> tuple[int, np.ndarray]:
         """Core action selection logic.
 
         Args:
@@ -219,7 +223,8 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
             temperature: Sampling temperature (0 = greedy).
             add_dirichlet: Whether to add Dirichlet noise at root.
 
-        Returns:
+        Returns
+        -------
             Tuple of (action, policy vector).
         """
         root = self.tree.get_or_create(
@@ -244,7 +249,7 @@ class AZBSMCTSAgent(BaseAgent, PolicyTargetMixin):
         s = float(np.sum(probs))
         if s <= 0:
             # No legal moves had probability - fallback to most visited
-            best_a = root.get_most_visited_action(actions=[a for a in legal])
+            best_a = root.get_most_visited_action(actions=list(legal))
             return int(best_a), pi
 
         probs /= s

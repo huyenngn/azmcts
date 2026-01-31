@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import dataclasses
 import random
 import typing as t
-from dataclasses import dataclass
 
 import numpy as np
-import pyspiel
+
+if t.TYPE_CHECKING:
+    import pyspiel
 
 
 class Agent(t.Protocol):
@@ -16,7 +18,7 @@ class Agent(t.Protocol):
         ...
 
 
-@dataclass
+@dataclasses.dataclass
 class AgentConfig:
     """Configuration for agent initialization."""
 

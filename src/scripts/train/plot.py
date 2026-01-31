@@ -1,15 +1,14 @@
-# scripts/train/plot.py
 from __future__ import annotations
 
 import argparse
 import pathlib
 
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 
-from scripts.common.io import read_jsonl
+from scripts.common import io
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument(
         "--run-dir",
@@ -26,7 +25,7 @@ def main():
         print(f"No train_metrics.jsonl found in {run_dir}")
         return
 
-    rows = read_jsonl(metrics_path)
+    rows = io.read_jsonl(metrics_path)
     if not rows:
         print(f"No rows in {metrics_path}")
         return

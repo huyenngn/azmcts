@@ -1,4 +1,4 @@
-name: ci
+name: test
 
 on:
   pull_request:
@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -34,21 +34,5 @@ jobs:
       - name: Sync deps
         run: uv sync
 
-      - name: Ruff
-        run: uv run ruff check .
-
-      - name: MyPy
-        run: uv run mypy src/ tests/
-
-      - name: Pylint
-        run: uv run pylint src/ tests/
-
-      - name: CLI smoke
-        run: |
-          uv run train --help
-          uv run tune --help
-          uv run eval-match --help
-          uv run eval-sweep --help
-          uv run plot-train --help
-          uv run plot-tune --help
-          uv run plot-eval --help
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short

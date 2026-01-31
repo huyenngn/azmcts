@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import random
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections import abc as cabc
 
 import numpy as np
 import pyspiel
@@ -10,10 +10,10 @@ import pyspiel
 from utils import utils
 
 # Type alias for opponent policy function: state -> action probabilities
-OpponentPolicy = Callable[[pyspiel.State], np.ndarray]
+OpponentPolicy = cabc.Callable[[pyspiel.State], np.ndarray]
 
 
-@dataclass
+@dataclasses.dataclass
 class _StepRecord:
     """Record of a single game step for belief reconstruction."""
 
@@ -23,8 +23,7 @@ class _StepRecord:
 
 
 class ParticleBeliefSampler:
-    """
-    Non-cheating belief sampler using particle filtering.
+    """Non-cheating belief sampler using particle filtering.
 
     Maintains particles (fully-determined states) consistent with
     the AI player's observation history without using hidden information.
@@ -81,8 +80,7 @@ class ParticleBeliefSampler:
     def step(
         self, actor: int, action: int, real_state_after: pyspiel.State
     ) -> None:
-        """
-        Update belief after a move.
+        """Update belief after a move.
 
         Args:
             actor: Player who made the move.
@@ -183,8 +181,7 @@ class ParticleBeliefSampler:
 
 
 class ParticleDeterminizationSampler:
-    """
-    Adapter conforming ParticleBeliefSampler to DeterminizationSampler.
+    """Adapter conforming ParticleBeliefSampler to DeterminizationSampler.
 
     Falls back to cloning current state if no particles available.
     """
@@ -193,7 +190,9 @@ class ParticleDeterminizationSampler:
         self.particle_sampler = particle_sampler
 
     def sample(
-        self, state: pyspiel.State, rng: random.Random
+        self,
+        state: pyspiel.State,
+        rng: random.Random,  # noqa: ARG002
     ) -> pyspiel.State:
         """Sample a determinized state from particles or clone."""
         p = self.particle_sampler.sample()

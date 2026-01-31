@@ -1,4 +1,3 @@
-# scripts/tune/plot.py
 """Generate plots from Optuna hyperparameter tuning results."""
 
 from __future__ import annotations
@@ -6,37 +5,33 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-from typing import TYPE_CHECKING
+import typing as t
 
-import matplotlib.pyplot as plt
 import optuna
-from optuna.visualization.matplotlib import (
-    plot_optimization_history,
-    plot_parallel_coordinate,
-    plot_param_importances,
-    plot_slice,
-)
+from matplotlib import figure
+from matplotlib import pyplot as plt
+from optuna.visualization import matplotlib as optuna_plot
 
 from utils import utils
 
-if TYPE_CHECKING:
-    from matplotlib.axes import Axes
+if t.TYPE_CHECKING:
+    from matplotlib import axes
 
 
 def _save_plot(
-    ax: Axes, path: pathlib.Path, width: float = 10, height: float = 6
+    ax: axes.Axes, path: pathlib.Path, width: float = 10, height: float = 6
 ) -> None:
     """Save a plot from an Axes object."""
     fig = ax.get_figure()
-    if fig is None or not hasattr(fig, "savefig"):
+    if fig is None or not isinstance(fig, figure.Figure):
         return
-    fig.set_size_inches(width, height)  # type: ignore[union-attr]
-    fig.savefig(path, bbox_inches="tight", dpi=150)  # type: ignore[union-attr]
-    plt.close(fig)  # type: ignore[arg-type]
+    fig.set_size_inches(width, height)
+    fig.savefig(path, bbox_inches="tight", dpi=150)
+    plt.close(fig)
     print(f"Wrote {path}")
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser(
         description="Generate plots from Optuna tuning results"
     )
@@ -93,7 +88,7 @@ def main():
     print(f"Best params: {study.best_params}")
 
     # 1. Optimization history
-    ax = plot_optimization_history(study)
+    ax = optuna_plot.plot_optimization_history(study)
     _save_plot(ax, outdir / f"optimization_history.{args.format}")
 
     # 2. Parameter importances (requires >= 2 completed trials)
@@ -102,7 +97,7 @@ def main():
     ]
     if len(completed) >= 2:
         try:
-            ax = plot_param_importances(study)
+            ax = optuna_plot.plot_param_importances(study)
             _save_plot(ax, outdir / f"param_importances.{args.format}")
         except Exception as e:
             print(f"Could not plot param importances: {e}")
@@ -111,14 +106,14 @@ def main():
 
     # 3. Parallel coordinate plot
     try:
-        ax = plot_parallel_coordinate(study)
+        ax = optuna_plot.plot_parallel_coordinate(study)
         _save_plot(ax, outdir / f"parallel_coordinate.{args.format}", width=12)
     except Exception as e:
         print(f"Could not plot parallel coordinate: {e}")
 
     # 4. Slice plots (one per parameter)
     try:
-        ax = plot_slice(study)
+        ax = optuna_plot.plot_slice(study)
         _save_plot(
             ax, outdir / f"slice_plots.{args.format}", width=14, height=10
         )

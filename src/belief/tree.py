@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import dataclasses
 
 
-@dataclass
+@dataclasses.dataclass
 class EdgeStats:
     """Statistics for a tree edge (action)."""
 
@@ -17,15 +17,15 @@ class EdgeStats:
         return 0.0 if self.n == 0 else self.w / self.n
 
 
-@dataclass
+@dataclasses.dataclass
 class Node:
     """A node in the belief tree indexed by observation."""
 
     obs_key: str
     player_to_act: int
     is_expanded: bool = False
-    edges: dict[int, EdgeStats] = field(default_factory=dict)
-    legal_actions: list[int] = field(default_factory=list)
+    edges: dict[int, EdgeStats] = dataclasses.field(default_factory=dict)
+    legal_actions: list[int] = dataclasses.field(default_factory=list)
     n: int = 0
 
     def get_most_visited_action(self, actions: list[int] | None = None) -> int:
@@ -38,7 +38,7 @@ class Node:
 class BeliefTree:
     """Tree structure mapping observations to nodes."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._nodes: dict[str, Node] = {}
 
     def get_or_create(self, obs_key: str, player_to_act: int) -> Node:

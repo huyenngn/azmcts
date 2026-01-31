@@ -10,11 +10,11 @@ description = "AlphaZero inspired AI for Phantom Go"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi[standard]",
-    "open-spiel",
-    "torch",
-    "optuna",
-    "matplotlib",
+  "fastapi[standard]",
+  "open-spiel",
+  "torch",
+  "optuna",
+  "matplotlib",
 ]
 
 [dependency-groups]
@@ -23,6 +23,9 @@ dev = [
   "ipykernel",
   "python-lsp-server",
   "pytest",
+  "mypy",
+  "pylint",
+  "pylint-google-style-guide-imports-enforcing",
 ]
 
 [project.scripts]
@@ -35,6 +38,47 @@ eval-sweep = "scripts.eval.sweep:main"
 plot-eval = "scripts.eval.plot:main"
 api = "scripts.api:main"
 
+[tool.mypy]
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+show_error_codes = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+
+[tool.pylint.master]
+load-plugins = ["pylint_google_style_guide_imports_enforcing"]
+
+[tool.pylint.messages_control]
+disable = ["all"]
+enable = ["C5101"]
+
+[tool.ruff.lint]
+extend-select = [
+  "F",   # Pyflakes rules
+  "I",   # Sort imports properly
+  "C4",  # Catch incorrect use of comprehensions, dict, list, etc
+  "FA",  # Enforce from __future__ import annotations
+  "ISC", # Good use of string concatenation
+  "ICN", # Use common import conventions
+  "RET", # Good return practices
+  "SIM", # Common simplification rules
+  "PTH", # Use pathlib instead of os.path
+  "TID", # Tidy import rules
+  "TC",  # Type check rules
+]
+ignore = [
+  "SIM108", # Use ternary operator instead of `if`-`else`-block
+  "SIM105", # Use `contextlib.suppress` instead of `try`-`except`-pass
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+ignore-decorators = ["typing.overload"]
 
 [tool.uv]
 default-groups = ["dev"]

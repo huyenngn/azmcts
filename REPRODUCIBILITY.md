@@ -95,10 +95,10 @@ Evaluation is deterministic by default when using the same seed.
 All seeds are derived deterministically from a single base seed using `derive_seed()`:
 
 ```python
-from scripts.common.seeding import derive_seed
+from scripts.common import seeding
 
 # For training self-play, game index 5, player 0
-seed = derive_seed(
+seed = seeding.derive_seed(
     base_seed=42,
     purpose="train/agent",
     game_idx=5,
