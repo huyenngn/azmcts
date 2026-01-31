@@ -195,21 +195,14 @@ def _play_ai_turns() -> list[PreviousMoveInfo]:
             app.state.policy, app.state.agent, app.state.state, app.state.rng
         )
 
-        if action in tried_actions:
-            logger.info(
-                "AI already tried action %d and failed, selecting again",
-                action,
-            )
-            continue
-
-        if (
+        if action in tried_actions or (
             action != PASS_ACTION
             and recent_actions.count(action) >= MAX_REPEATED_ACTION
         ):
             logger.warning(
-                "AI stuck in loop (action %d repeated %d times), skipping action",
+                "AI stuck in loop (action %d repeated more than %d times), skipping action",
                 action,
-                recent_actions.count(action),
+                MAX_REPEATED_ACTION,
             )
             tried_actions.add(action)
             continue
