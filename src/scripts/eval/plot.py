@@ -17,7 +17,6 @@ def main() -> None:
         required=True,
         help="Path to a single training run directory (e.g., runs/run_20260130_123456)",
     )
-    p.add_argument("--x", type=str, default="x_games")
     args = p.parse_args()
 
     run_dir = pathlib.Path(args.run_dir)
@@ -33,7 +32,7 @@ def main() -> None:
         print(f"No rows in {inp}")
         return
 
-    xs = np.array([r.get(args.x, float("nan")) for r in rows], dtype=float)
+    xs = np.array([r.get("x_games", float("nan")) for r in rows], dtype=float)
     wr_b = np.array(
         [r.get("wr_vs_bsmcts", float("nan")) for r in rows], dtype=float
     )

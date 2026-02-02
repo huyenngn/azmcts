@@ -44,7 +44,7 @@ def play_game(
     sampler_cfg: config.SamplerConfig,
     seed: int,
     device: str,
-    model_path: str,
+    model_path: str | None,
     run_id: str,
     game_idx: int,
 ) -> tuple[float, float]:
@@ -111,7 +111,7 @@ def run_match(
     sampler_cfg: config.SamplerConfig,
     seed: int,
     device: str,
-    model_path: str,
+    model_path: str | None,
     run_id: str,
 ) -> dict[str, Result]:
     out: dict[str, Result] = {}
@@ -186,7 +186,7 @@ def main() -> None:
     p.add_argument("--b", type=str, default="bsmcts")
     p.add_argument("--flip-colors", action="store_true")
 
-    p.add_argument("--model", type=str, required=True)
+    p.add_argument("--model", type=str, default=None)
     p.add_argument("--out-json", type=str, default="")
 
     p.add_argument("--num-particles", type=int, default=32)

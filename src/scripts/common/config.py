@@ -69,7 +69,7 @@ class EvalConfig:
     a: str
     b: str
     flip_colors: bool
-    model_path: str
+    model_path: str | None
 
 
 def to_jsonable(obj: t.Any) -> t.Any:

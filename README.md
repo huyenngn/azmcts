@@ -74,10 +74,12 @@ and search remains stable.
 ```sh
 uv run tune \
   --trials 50 \
-  --games 100 \
-  --epochs 5 \
-  --eval-n 30 \
+  --games 10 \
+  --epochs 2 \
+  --eval-n 20 \
+  --batch 64 \
   --seed 42 \
+  --device cuda \
   --storage sqlite:///runs/optuna.db \
   --study-name az_explore
 ```
@@ -138,6 +140,14 @@ Each training run creates a directory under `runs/` containing:
 > 10 checkpoints (at 100, 200, ..., 1000 games) in a single run. Then use
 > `eval-sweep` to evaluate all checkpoints.
 
+It is possible to resume training from a previous run:
+
+```sh
+uv run train \
+  --resume \
+  --run-dir runs/<run_dir>
+```
+
 ---
 
 ### 3. Evaluation
@@ -148,15 +158,14 @@ Evaluate one model against a baseline:
 
 ```sh
 uv run eval-match \
-  --model runs/<run_dir>/model.pt \
-  --a azbsmcts \
+  --a random \
   --b bsmcts \
-  --n 50 \
+  --n 20 \
   --T 8 \
   --S 4 \
   --c-puct 1.5 \
   --seed 42 \
-  --out-json runs/<run_dir>/eval.json
+  --out-json runs/<run_dir>/bsmcts_vs_random.json
 ```
 
 #### Checkpoint Sweep
