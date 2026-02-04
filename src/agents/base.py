@@ -7,47 +7,45 @@ import typing as t
 import numpy as np
 
 if t.TYPE_CHECKING:
-    import pyspiel
+  import openspiel
 
 
 class Agent(t.Protocol):
-    """Protocol for game-playing agents."""
+  """Protocol for game-playing agents."""
 
-    def select_action(self, state: pyspiel.State) -> int:
-        """Select an action given the current game state."""
-        ...
+  def select_action(self, state: openspiel.State) -> int:
+    """Select an action given the current game state."""
+    ...
 
 
 @dataclasses.dataclass
 class AgentConfig:
-    """Configuration for agent initialization."""
+  """Configuration for agent initialization."""
 
-    seed: int = 0
+  seed: int = 0
 
 
 class BaseAgent:
-    """Base class providing RNG and observation utilities."""
+  """Base class providing RNG and observation utilities."""
 
-    def __init__(self, player_id: int, num_actions: int, seed: int = 0):
-        self.player_id = player_id
-        self.num_actions = num_actions
-        self.rng = random.Random(seed)
+  def __init__(self, player_id: int, num_actions: int, seed: int = 0):
+    self.player_id = player_id
+    self.num_actions = num_actions
+    self.rng = random.Random(seed)
 
-    def obs_key(self, state: pyspiel.State, player_id: int) -> str:
-        """Return observation string for the specified player."""
-        return state.observation_string(player_id)
+  def obs_key(self, state: openspiel.State, player_id: int) -> str:
+    """Return observation string for the specified player."""
+    return state.observation_string(player_id)
 
-    def obs_tensor(self, state: pyspiel.State, player_id: int) -> np.ndarray:
-        """Return observation tensor for the specified player."""
-        return np.asarray(
-            state.observation_tensor(player_id), dtype=np.float32
-        )
+  def obs_tensor(self, state: openspiel.State, player_id: int) -> np.ndarray:
+    """Return observation tensor for the specified player."""
+    return np.asarray(state.observation_tensor(player_id), dtype=np.float32)
 
 
 class PolicyTargetMixin:
-    """Mixin for agents that provide policy targets for training."""
+  """Mixin for agents that provide policy targets for training."""
 
-    def select_action_with_pi(
-        self, state: pyspiel.State, temperature: float = 1.0
-    ) -> tuple[int, np.ndarray]:
-        raise NotImplementedError
+  def select_action_with_pi(
+    self, state: openspiel.State, temperature: float = 1.0
+  ) -> tuple[int, np.ndarray]:
+    raise NotImplementedError
