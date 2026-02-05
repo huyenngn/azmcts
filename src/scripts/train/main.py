@@ -306,9 +306,8 @@ def main() -> None:
     help="Cap replay buffer size (0 = unlimited)",
   )
 
-  # sampler defaults (match your current eval hardcodes, but now explicit) :contentReference[oaicite:6]{index=6}
   p.add_argument("--num-particles", type=int, default=32)
-  p.add_argument("--opp-tries", type=int, default=8)
+  p.add_argument("--opp-tries", type=int, default=32)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
   args = p.parse_args()
