@@ -8,6 +8,8 @@ import numpy as np
 
 import openspiel
 
+EMERGENCY_MAX_TRIES = 10_000
+
 # Type alias for opponent policy function: state -> action probabilities
 OpponentPolicy = cabc.Callable[[openspiel.State], np.ndarray]
 
@@ -21,7 +23,7 @@ class _StepRecord:
   ai_obs_after: str
 
 
-class ParticleBeliefSampler:
+class ParticleDeterminizationSampler:
   """Non-cheating belief sampler using particle filtering.
 
   Maintains particles (fully-determined states) consistent with
@@ -33,7 +35,7 @@ class ParticleBeliefSampler:
     game: openspiel.Game,
     ai_id: int,
     num_particles: int = 32,
-    opp_tries_per_particle: int = 8,
+    opp_tries_per_particle: int = 32,
     rebuild_max_tries: int = 200,
     seed: int = 0,
     opponent_policy: OpponentPolicy | None = None,
@@ -129,10 +131,12 @@ class ParticleBeliefSampler:
     if not self._particles:
       self._rebuild_particles()
 
-  def sample(self) -> openspiel.State | None:
+  def sample(self) -> openspiel.State:
     """Sample a particle consistent with observation history."""
+    if not self._history:
+      return self.game.new_initial_state()
     if not self._particles:
-      return None
+      raise RuntimeError("No particles available to sample from")
 
     return self.rng.choice(self._particles).clone()
 
@@ -144,7 +148,7 @@ class ParticleBeliefSampler:
     while (
       len(self._particles) < self.num_particles
       and tries < self.rebuild_max_tries
-    ):
+    ) or (len(self._particles) == 0 and tries < EMERGENCY_MAX_TRIES):
       tries += 1
       s = self.game.new_initial_state()
       ok = True
@@ -177,22 +181,3 @@ class ParticleBeliefSampler:
 
       if ok:
         self._particles.append(s)
-
-
-class ParticleDeterminizationSampler:
-  """Adapter conforming ParticleBeliefSampler to DeterminizationSampler.
-
-  Falls back to cloning current state if no particles available.
-  """
-
-  def __init__(self, particle_sampler: ParticleBeliefSampler):
-    self.particle_sampler = particle_sampler
-
-  def sample(
-    self,
-    state: openspiel.State,
-    rng: random.Random,  # noqa: ARG002
-  ) -> openspiel.State:
-    """Sample a determinized state from particles or clone."""
-    p = self.particle_sampler.sample()
-    return p if p is not None else state.clone()

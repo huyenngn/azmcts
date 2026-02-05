@@ -44,7 +44,7 @@ class BSMCTSAgent(agents.BaseAgent):
       self._expand(root, state)
 
     for _ in range(self.T):
-      gamma = self.sampler.sample(state, self.rng)
+      gamma = self.sampler.sample()
       for _ in range(self.S):
         self._search(gamma.clone())
 

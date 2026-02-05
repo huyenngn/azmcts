@@ -28,10 +28,9 @@ def net(game: openspiel.Game) -> nets.TinyPolicyValueNet:
 @pytest.fixture
 def sampler(game: openspiel.Game) -> samplers.ParticleDeterminizationSampler:
   """Create a particle sampler for testing."""
-  belief = samplers.ParticleBeliefSampler(
+  return samplers.ParticleDeterminizationSampler(
     game=game, ai_id=0, num_particles=8, seed=42
   )
-  return samplers.ParticleDeterminizationSampler(belief)
 
 
 class TestAZBSMCTSAgent:
@@ -116,10 +115,9 @@ class TestAZBSMCTSAgent:
     """Test that same seed produces same action sequence."""
 
     def make_agent() -> agents.AZBSMCTSAgent:
-      belief = samplers.ParticleBeliefSampler(
+      samp = samplers.ParticleDeterminizationSampler(
         game=game, ai_id=0, num_particles=8, seed=123
       )
-      samp = samplers.ParticleDeterminizationSampler(belief)
       return agents.AZBSMCTSAgent(
         player_id=0,
         num_actions=game.num_distinct_actions(),
@@ -169,10 +167,9 @@ class TestAZBSMCTSAgent:
     _, pi_train = agent_noisy.select_action_with_pi(state)
 
     # Agent without noise
-    belief2 = samplers.ParticleBeliefSampler(
+    sampler2 = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, num_particles=8, seed=42
     )
-    sampler2 = samplers.ParticleDeterminizationSampler(belief2)
     agent_no_noise = agents.AZBSMCTSAgent(
       player_id=0,
       num_actions=game.num_distinct_actions(),
@@ -200,10 +197,9 @@ class TestBSMCTSAgent:
 
   def test_select_action_returns_legal(self, game: openspiel.Game) -> None:
     """Test that BS-MCTS agent returns legal actions."""
-    belief = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, num_particles=8, seed=42
     )
-    sampler = samplers.ParticleDeterminizationSampler(belief)
 
     agent = agents.BSMCTSAgent(
       player_id=0,

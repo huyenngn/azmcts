@@ -26,7 +26,7 @@ def make_belief_sampler(
   purpose: str,
   game_idx: int | None,
   opponent_policy: samplers.OpponentPolicy | None = None,
-) -> samplers.ParticleBeliefSampler:
+) -> samplers.ParticleDeterminizationSampler:
   seed = seeding.derive_seed(
     base_seed,
     purpose=f"{purpose}/belief",
@@ -34,7 +34,7 @@ def make_belief_sampler(
     game_idx=game_idx,
     player_id=player_id,
   )
-  return samplers.ParticleBeliefSampler(
+  return samplers.ParticleDeterminizationSampler(
     game=game,
     ai_id=player_id,
     num_particles=sampler_cfg.num_particles,
@@ -60,7 +60,10 @@ def make_agent(
   net: nets.TinyPolicyValueNet
   | None = None,  # optional for training self-play
   game_idx: int | None,
-) -> tuple[agents.Agent, samplers.ParticleBeliefSampler] | tuple[None, None]:
+) -> (
+  tuple[agents.Agent, samplers.ParticleDeterminizationSampler]
+  | tuple[None, None]
+):
   if kind == "random":
     return None, None
 
@@ -108,7 +111,7 @@ def make_agent(
 
     opponent_policy = make_opponent_policy(az_net, device)
 
-  particle = make_belief_sampler(
+  sampler = make_belief_sampler(
     game=game,
     player_id=player_id,
     base_seed=base_seed,
@@ -118,7 +121,6 @@ def make_agent(
     game_idx=game_idx,
     opponent_policy=opponent_policy,
   )
-  sampler = samplers.ParticleDeterminizationSampler(particle)
 
   if kind == "bsmcts":
     return (
@@ -130,7 +132,7 @@ def make_agent(
         S=search_cfg.S,
         seed=agent_seed,
       ),
-      particle,
+      sampler,
     )
 
   if kind == "azbsmcts":
@@ -150,7 +152,7 @@ def make_agent(
         dirichlet_alpha=search_cfg.dirichlet_alpha,
         dirichlet_weight=search_cfg.dirichlet_weight,
       ),
-      particle,
+      sampler,
     )
 
   raise ValueError(f"Unknown agent kind: {kind}")

@@ -87,12 +87,12 @@ class TestBSMCTSReproducibility:
 
   def _create_agent_with_seed(
     self, game: openspiel.Game, player_id: int, seed: int
-  ) -> tuple[agents.BSMCTSAgent, samplers.ParticleBeliefSampler]:
+  ) -> tuple[agents.BSMCTSAgent, samplers.ParticleDeterminizationSampler]:
     """Create a BS-MCTS agent with deterministic seeding."""
     particle_seed = seeding.derive_seed(
       seed, purpose="test/belief", game_idx=0, player_id=player_id
     )
-    particle = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game,
       ai_id=player_id,
       num_particles=8,
@@ -106,12 +106,12 @@ class TestBSMCTSReproducibility:
     agent = agents.BSMCTSAgent(
       player_id=player_id,
       num_actions=game.num_distinct_actions(),
-      sampler=samplers.ParticleDeterminizationSampler(particle),
+      sampler=sampler,
       T=4,  # Small T for fast tests
       S=2,
       seed=agent_seed,
     )
-    return agent, particle
+    return agent, sampler
 
   def _play_game(
     self, game: openspiel.Game, seed: int

@@ -18,7 +18,7 @@ class TestParticleBeliefSampler:
 
   def test_init_default(self, game: openspiel.Game) -> None:
     """Test default initialization."""
-    sampler = samplers.ParticleBeliefSampler(game=game, ai_id=0)
+    sampler = samplers.ParticleDeterminizationSampler(game=game, ai_id=0)
     assert sampler.ai_id == 0
     assert sampler.num_particles == 32
     assert sampler.opponent_policy is None
@@ -29,14 +29,16 @@ class TestParticleBeliefSampler:
     def dummy_policy(state: openspiel.State) -> np.ndarray:
       return np.ones(9) / 9
 
-    sampler = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=dummy_policy
     )
     assert sampler.opponent_policy is dummy_policy
 
   def test_sample_opponent_action_uniform(self, game: openspiel.Game) -> None:
     """Test opponent action sampling with uniform random (no policy)."""
-    sampler = samplers.ParticleBeliefSampler(game=game, ai_id=0, seed=42)
+    sampler = samplers.ParticleDeterminizationSampler(
+      game=game, ai_id=0, seed=42
+    )
     state = game.new_initial_state()
 
     # Sample many actions and verify they're all legal
@@ -59,7 +61,7 @@ class TestParticleBeliefSampler:
           probs[a] = 0.001
       return probs
 
-    sampler = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=biased_policy, seed=42
     )
     state = game.new_initial_state()
@@ -79,7 +81,7 @@ class TestParticleBeliefSampler:
     def zero_policy(state: openspiel.State) -> np.ndarray:
       return np.zeros(9)
 
-    sampler = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=zero_policy, seed=42
     )
     state = game.new_initial_state()
@@ -90,7 +92,9 @@ class TestParticleBeliefSampler:
 
   def test_reset_clears_state(self, game: openspiel.Game) -> None:
     """Test that reset clears history and particles."""
-    sampler = samplers.ParticleBeliefSampler(game=game, ai_id=0, seed=42)
+    sampler = samplers.ParticleDeterminizationSampler(
+      game=game, ai_id=0, seed=42
+    )
     state = game.new_initial_state()
 
     # Make some moves to build history
@@ -105,7 +109,7 @@ class TestParticleBeliefSampler:
 
   def test_step_builds_particles(self, game: openspiel.Game) -> None:
     """Test that step triggers particle building."""
-    sampler = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, num_particles=10, seed=42
     )
     state = game.new_initial_state()
@@ -123,19 +127,15 @@ class TestParticleDeterminizationSampler:
 
   def test_sample_returns_state(self, game: openspiel.Game) -> None:
     """Test that sample returns a valid state."""
-    import random
-
-    belief = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, num_particles=10, seed=42
     )
-    sampler = samplers.ParticleDeterminizationSampler(belief)
 
     state = game.new_initial_state()
     state.apply_action(4)
-    belief.step(actor=0, action=4, real_state_after=state)
+    sampler.step(actor=0, action=4, real_state_after=state)
 
-    rng = random.Random(123)
-    sampled = sampler.sample(state, rng)
+    sampled = sampler.sample()
 
     assert sampled is not None
     assert isinstance(sampled, openspiel.State)
@@ -144,16 +144,10 @@ class TestParticleDeterminizationSampler:
     self, game: openspiel.Game
   ) -> None:
     """Test fallback to cloning when no particles available."""
-    import random
-
-    belief = samplers.ParticleBeliefSampler(
+    sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, num_particles=10, rebuild_max_tries=0, seed=42
     )
-    sampler = samplers.ParticleDeterminizationSampler(belief)
 
-    state = game.new_initial_state()
-    rng = random.Random(123)
-
-    # No particles built yet, should fall back to clone
-    sampled = sampler.sample(state, rng)
+    # No history, should return initial state
+    sampled = sampler.sample()
     assert sampled is not None

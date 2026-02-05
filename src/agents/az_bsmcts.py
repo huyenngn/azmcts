@@ -230,7 +230,7 @@ class AZBSMCTSAgent(base.BaseAgent, base.PolicyTargetMixin):
       self._expand(root, state, add_dirichlet=add_dirichlet)
 
     for _ in range(self.T):
-      gamma = self.sampler.sample(state, self.rng)
+      gamma = self.sampler.sample()
       for _ in range(self.S):
         self._search(gamma.clone())
 

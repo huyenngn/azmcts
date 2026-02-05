@@ -106,15 +106,16 @@ Run self-play training with parameters from tuning or manual selection:
 uv run train \
   --games 1000 \
   --checkpoint-interval 100 \
-  --replay-max-examples 100000 \
+  --replay-max-examples 50000 \
   --T 8 \
   --S 4 \
-  --c-puct 1.5 \
+  --c-puct 1.0 \
   --dirichlet-alpha 0.03 \
-  --num-particles 32 \
+  --dirichlet-weight 0.25 \
+  --num-particles 12 \
   --epochs 5 \
   --batch 64 \
-  --lr 1e-3 \
+  --lr 1e-4 \
   --device cuda \
   --seed 42
 ```

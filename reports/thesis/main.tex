@@ -426,21 +426,32 @@ The following agents are evaluated:
 All agents use the same search parameters when applicable.
 
 \subsection{Training Configuration}
-Only the AlphaZero-inspired belief agent requires training. Training is performed through self-play using belief-state MCTS guided by the current neural network. The training configuration below was selected after minimal exploratory tuning (i.e., small trial runs to verify that learning proceeds and that search remains stable under the chosen budget), rather than a systematic hyperparameter optimization procedure.
+The training configuration used in this thesis was chosen to prioritize experimental clarity, stability, and fairness over maximum playing strength. Rather than performing extensive hyperparameter optimization, all agents were trained and evaluated under a fixed and shared computational budget, ensuring that observed differences in performance can be attributed to the presence or absence of learned guidance rather than unequal tuning effort.
+\subsubsection{Fixed Search and Budget Parameters}
 
-Unless otherwise specified, the following configuration is used:
-\begin{itemize}
-  \item Board size: $9 \times 9$
-  \item Number of simulations per move ($T$): 8
-  \item Number of belief samples per move ($S$): 4
-  \item Training epochs per iteration: 5
-  \item Batch size: 64
-  \item Learning rate: $10^{-3}$
-\end{itemize}
+Parameters controlling the Monte Carlo Tree Search budget—namely the number of simulations per move
+$T$, the number of belief samples $S$, and the number of belief-state particles—were treated as budget parameters rather than tunable hyperparameters. These values were selected to provide a minimal but non-trivial search budget that remains computationally feasible on the available hardware while still allowing meaningful comparisons between agents. Once chosen, these parameters were held constant across all experiments.
 
-To study the effect of training budget, multiple models are trained with increasing numbers of self-play games. In particular, training budgets of 100, 300, 600, and 1000 self-play games are considered, while all other parameters are held constant across runs.
+This design choice reflects the goal of the thesis: to compare a belief-state MCTS baseline against an AlphaZero-inspired variant under identical computational constraints, rather than to maximize absolute playing strength.
 
-Overall, the search and training parameters used in this thesis were chosen to balance computational feasibility with experimental clarity. Rather than tuning parameters for maximum performance, all agents are evaluated under the same fixed computational budget per move to ensure a fair comparison. The number of simulations and belief samples per move was chosen to provide a minimal but non-trivial search budget that enables meaningful comparisons between agents while remaining computationally feasible. Consequently, the reported parameters should be interpreted as controlled defaults rather than optimized settings.
+\subsubsection{Training Protocol and Learning Parameters}
+
+Neural network training followed an AlphaZero-style self-play pipeline, alternating between self-play data generation and supervised updates of the policy and value networks. The number of self-play games and training epochs was fixed in advance, and the learning rate and batch size were selected conservatively to favor stable learning dynamics over rapid convergence. No attempt was made to optimize these values for peak performance.
+
+A replay buffer with a fixed maximum capacity was used to bound memory usage and prevent late-stage training from becoming dominated by early, potentially low-quality data. Training checkpoints were saved at regular intervals, and training could be resumed from the most recent checkpoint to accommodate long-running jobs and cluster wall-time limits.
+
+\subsubsection{Exploration Mechanisms}
+
+During self-play, controlled stochasticity was introduced using two standard AlphaZero mechanisms: Dirichlet noise added to the root prior and temperature-based action selection. Dirichlet noise was applied only during self-play to encourage exploratory behavior and avoid premature policy collapse, while evaluation games were conducted without exploration noise and with deterministic action selection. The corresponding parameters were fixed throughout all experiments and were not tuned.
+
+This separation between training-time exploration and evaluation-time determinism ensures that reported results reflect the learned policy strength rather than stochastic effects.
+
+\subsubsection{Rationale and Scope}
+
+Only minimal exploratory runs were conducted to verify that the chosen configuration did not lead to pathological behavior such as divergence, degenerate policies, or unstable training. Beyond this sanity checking, no hyperparameter optimization was performed. Consequently, the reported configuration should be interpreted as a set of controlled defaults rather than optimized settings.
+
+This approach aligns with the central objective of the thesis: to assess whether incorporating deep learning into belief-state MCTS meaningfully alters agent behavior and performance under equal computational budgets, rather than to demonstrate state-of-the-art performance.
+
 
 \subsection{Evaluation Protocol}
 
