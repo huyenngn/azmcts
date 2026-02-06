@@ -38,7 +38,7 @@ jobs:
         run: |
           uv run train \
             --games 2 --checkpoint-interval 1 --T 2 --S 2 --epochs 2 --seed 0 \
-            --runs-root artifacts/runs --run-name smoke
+            --runs-root artifacts/runs --run-name smoke --rebuild-tries 2
 
       - name: Smoke eval match
         run: |
@@ -52,6 +52,7 @@ jobs:
           echo "Using run directory: $RUN_DIR"
           uv run eval-match \
             --model "$RUN_DIR/model.pt" \
+            --rebuild-tries 2 \
             --a azbsmcts --b bsmcts --n 3 --T 2 --S 2 --seed 0 \
             --out-json "$RUN_DIR/eval_match.json"
 

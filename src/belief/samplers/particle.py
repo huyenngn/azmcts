@@ -34,7 +34,9 @@ class ParticleDeterminizationSampler:
     ai_id: int,
     num_particles: int = 24,
     max_matching_opp_actions: int = 24,
+    min_matching_opp_actions: int = 2,
     rebuild_max_tries: int = 200,
+    matching_tries_per_particle: int = 100,
     seed: int = 0,
     opponent_policy: OpponentPolicy | None = None,
   ):
@@ -49,7 +51,9 @@ class ParticleDeterminizationSampler:
     self.ai_id = ai_id
     self.num_particles = num_particles
     self.max_matching_opp_actions = max_matching_opp_actions
+    self.min_matching_opp_actions = min_matching_opp_actions
     self.rebuild_max_tries = rebuild_max_tries
+    self.matching_tries_per_particle = matching_tries_per_particle
     self.rng = random.Random(seed)
     self.opponent_policy = opponent_policy
 
@@ -104,31 +108,35 @@ class ParticleDeterminizationSampler:
       )
       return self.game.new_initial_state()
 
+    logger.debug(
+      "Particle sampler returning sample from %d particles.",
+      len(self._particles),
+    )
     return self.rng.choice(list(self._particles.values())).clone()
 
   def _ai_obs(self, state: openspiel.State) -> str:
     return state.observation_string(self.ai_id)
 
-  def _get_opponent_actions_and_weights(
+  def _get_opponent_action_weights(
     self, state: openspiel.State
-  ) -> list[tuple[int, float]]:
-    """Get legal opponent actions in a deterministic order (policy) or random permutation (no policy)."""
+  ) -> list[float]:
     legal = state.legal_actions()
     if not legal:
       return []
-
+    uniform_probs = np.ones(len(legal), dtype=np.float64) / len(legal)
     if self.opponent_policy is None:
-      return [(a, 1.0) for a in self.rng.sample(legal, len(legal))]
+      probs = uniform_probs
+    else:
+      policy_probs = self.opponent_policy(state)
+      legal_policy_probs = np.array(
+        [policy_probs[a] for a in legal], dtype=np.float64
+      )
+      legal_policy_probs = np.maximum(legal_policy_probs, 1e-12)
+      legal_policy_probs /= legal_policy_probs.sum()
 
-    probs = self.opponent_policy(state)
-    legal_probs = np.array([probs[a] for a in legal], dtype=np.float64)
-    legal_probs = np.maximum(legal_probs, 1e-12)
-    total = float(legal_probs.sum())
-    if total <= 0.0:
-      return [(a, 1.0) for a in self.rng.sample(legal, len(legal))]
+      probs = 0.5 * legal_policy_probs + 0.5 * uniform_probs
 
-    legal_probs /= total
-    return sorted(zip(legal, legal_probs), key=lambda x: x[1], reverse=True)
+    return probs.tolist()
 
   def _update_for_ai_move(self, rec: _StepRecord) -> None:
     assert rec.actor_is_ai and rec.ai_action is not None
@@ -157,27 +165,39 @@ class ParticleDeterminizationSampler:
     """Generate up to K matching opponent-successor states for a single particle.
 
     Returns list of (child_state, weight).
-    Weight is proportional to opponent policy prob for the chosen action within legal actions.
+    Uses stochastic sampling from a mixture of policy and uniform to avoid collapse
+    when the policy is wrong.
     """
     p2 = particle.clone()
-    if not p2.legal_actions():
+    legal = p2.legal_actions()
+    if not legal:
       return []
 
-    opp_actions_and_weights = self._get_opponent_actions_and_weights(p2)
-    if not opp_actions_and_weights:
-      return []
+    probs = self._get_opponent_action_weights(p2)
 
     matches: list[tuple[openspiel.State, float]] = []
+    tried_actions: set[int] = set()
 
-    for a, w in opp_actions_and_weights:
+    for _ in range(self.matching_tries_per_particle):
+      if len(matches) >= self.max_matching_opp_actions:
+        break
+      if len(tried_actions) >= len(legal):
+        break
+
+      action_idx = self.rng.choices(range(len(legal)), weights=probs, k=1)[0]
+      action = legal[action_idx]
+
+      if action in tried_actions:
+        continue
+      tried_actions.add(action)
+
       p3 = p2.clone()
-      p3.apply_action(a)
+      p3.apply_action(action)
       if self._ai_obs(p3) != target_obs:
         continue
 
-      matches.append((p3, w))
-      if len(matches) >= self.max_matching_opp_actions:
-        break
+      weight = probs[action_idx]
+      matches.append((p3, weight))
 
     return matches
 
@@ -250,8 +270,9 @@ class ParticleDeterminizationSampler:
           break
 
         # Aggressive decay as game progresses
-        self.max_matching_opp_actions = 1 + int(
-          attempt_max_opp_actions / ((i + 1) ** 2)
+        self.max_matching_opp_actions = max(
+          int(attempt_max_opp_actions / ((i + 1) ** 2)),
+          self.min_matching_opp_actions,
         )
 
         if rec.actor_is_ai:

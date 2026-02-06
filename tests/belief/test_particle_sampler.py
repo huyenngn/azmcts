@@ -34,11 +34,9 @@ class TestParticleBeliefSampler:
     )
     state = game.new_initial_state()
 
-    # Sample many actions and verify they're all legal
-    actions = sampler._get_opponent_actions_and_weights(state)
-    legal = state.legal_actions()
-    for a, w in actions:
-      assert a in legal
+    probs = sampler._get_opponent_action_weights(state)
+    assert len(probs) == len(state.legal_actions())
+    assert np.allclose(probs, 1 / len(state.legal_actions()))
 
   def test_sample_opponent_action_with_policy(
     self, game: openspiel.Game
@@ -62,8 +60,8 @@ class TestParticleBeliefSampler:
     # Sample many actions - should heavily favor action 4
     center_count = 0
     for _ in range(1000):
-      actions = sampler._get_opponent_actions_and_weights(state)
-      if actions[0][0] == 4:
+      probs = sampler._get_opponent_action_weights(state)
+      if np.argmax(probs) == 4:
         center_count += 1
 
     # With 99% probability, center should be chosen most of the time
@@ -83,8 +81,9 @@ class TestParticleBeliefSampler:
     state = game.new_initial_state()
 
     # Should fall back to uniform when all probs are zero
-    action = sampler._get_opponent_actions_and_weights(state)[0][0]
-    assert action in state.legal_actions()
+    probs = sampler._get_opponent_action_weights(state)
+    assert len(probs) == len(state.legal_actions())
+    assert np.allclose(probs, 1 / len(state.legal_actions()))
 
   def test_reset_clears_state(self, game: openspiel.Game) -> None:
     """Test that reset clears history and particles."""

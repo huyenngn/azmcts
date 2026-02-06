@@ -92,8 +92,8 @@ uv run tune \
 | `S`                        | 4–6         | Belief samples (determinizations) |
 | `c_puct`                   | 0.5–3.0     | PUCT exploration constant         |
 | `lr`                       | 2e-4 – 3e-3 | Learning rate                     |
-| `num_particles`            | 10–48       | Belief state particles            |
-| `max_matching_opp_actions` | 2–8         | Max opponent actions for matching |
+| `num_particles`            | 12–36       | Belief state particles            |
+| `max_matching_opp_actions` | 12–36       | Max opponent actions for matching |
 
 Each trial produces its own directory under `runs/`. Best trial summary is written to `runs/optuna_best.json`.
 
@@ -105,19 +105,22 @@ Run self-play training with parameters from tuning or manual selection:
 
 ```sh
 uv run train \
+  --seed 42 \
+  --device cuda \
   --games 1000 \
   --checkpoint-interval 10 \
-  --replay-max-examples 50000 \
   --T 8 \
   --S 4 \
   --c-puct 1.0 \
-  --num-particles 24 \
-  --max-matching-opp-actions 24 \
+  --dirichlet-alpha 0.03 \
+  --dirichlet-weight 0.25 \
   --epochs 5 \
   --batch 64 \
   --lr 1e-4 \
-  --device cuda \
-  --seed 42
+  --replay-max-examples 50000 \
+  --num-particles 24 \
+  --max-matching-opp-actions 24 \
+  --rebuild-tries 200
 ```
 
 Training uses **interleaved self-play and learning** (like AlphaZero):
@@ -157,13 +160,19 @@ Evaluate one model against a baseline:
 
 ```sh
 uv run eval-match \
-  --a random \
-  --b bsmcts \
+  --seed 42 \
+  --device cuda \
   --n 20 \
   --T 8 \
   --S 4 \
-  --c-puct 1.5 \
-  --seed 42 \
+  --c-puct 1.0 \
+  --dirichlet-alpha 0.03 \
+  --dirichlet-weight 0.25 \
+  --a random \
+  --b bsmcts \
+  --num-particles 24 \
+  --max-matching-opp-actions 24 \
+  --rebuild-tries 200 \
   --out-json runs/<run_dir>/bsmcts_vs_random.json
 ```
 
@@ -174,11 +183,17 @@ Evaluate all checkpoints from a single training run:
 ```sh
 uv run eval-sweep \
   --run-dir runs/<run_dir> \
+  --seed 42 \
+  --device cuda \
   --n 20 \
   --T 8 \
   --S 4 \
-  --c-puct 1.5 \
-  --seed 42
+  --c-puct 1.0 \
+  --dirichlet-alpha 0.03 \
+  --dirichlet-weight 0.25 \
+  --num-particles 24 \
+  --max-matching-opp-actions 24 \
+  --rebuild-tries 200
 ```
 
 This generates `runs/<run_dir>/eval_sweep.jsonl` with win rates for each checkpoint.
