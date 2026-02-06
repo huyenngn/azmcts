@@ -26,6 +26,7 @@ import DrawerTitle from '@/components/ui/drawer/DrawerTitle.vue'
 import DrawerDescription from '@/components/ui/drawer/DrawerDescription.vue'
 
 const THINKING_DELAY = 300
+const NUM_PARTICLES_TO_SHOW = 10
 
 const props = defineProps<{
   playerId: number
@@ -38,6 +39,7 @@ const returns = ref<number[]>([0.0, 0.0])
 const isLoading = ref<boolean>(false)
 const moveHistory = ref<string[]>([])
 const particles = ref<string[]>([])
+const totalParticles = ref<number>(0)
 
 function parseBoard(observation: string): number[] {
   const rows = observation.matchAll(/\d\s([+OX]+)/g)
@@ -110,11 +112,15 @@ async function fetchParticles() {
   if (isLoading.value) return
   isLoading.value = true
   try {
-    const response = await axios.get<ParticlesResponse>('/particles/10')
+    const response = await axios.get<ParticlesResponse>(
+      `/particles?num_particles=${NUM_PARTICLES_TO_SHOW}`,
+    )
     particles.value = response.data.observations
+    totalParticles.value = response.data.total
   } catch (error) {
     console.error('Failed to fetch particles:', error)
     particles.value = []
+    totalParticles.value = 0
   } finally {
     isLoading.value = false
   }
@@ -157,7 +163,8 @@ onMounted(() => {
               <DrawerHeader>
                 <DrawerTitle>Particle Filter Visualization</DrawerTitle>
                 <DrawerDescription
-                  >Visualize a subset of particles from the particle filter.</DrawerDescription
+                  >This is a subset of the total {{ totalParticles }} particles sampled from the
+                  current belief state.</DrawerDescription
                 >
               </DrawerHeader>
               <ScrollArea class="h-96">

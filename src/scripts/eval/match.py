@@ -186,8 +186,8 @@ def main() -> None:
   p.add_argument("--model", type=str, default=None)
   p.add_argument("--out-json", type=str, default="")
 
-  p.add_argument("--num-particles", type=int, default=24)
-  p.add_argument("--max-matching-opp-actions", type=int, default=24)
+  p.add_argument("--num-particles", type=int, default=120)
+  p.add_argument("--max-matching-opp-actions", type=int, default=64)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
   args = p.parse_args()

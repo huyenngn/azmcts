@@ -105,7 +105,7 @@ class TestParticleBeliefSampler:
   def test_step_builds_particles(self, game: openspiel.Game) -> None:
     """Test that step triggers particle building."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, num_particles=10, max_matching_opp_actions=2, seed=42
+      game=game, ai_id=0, num_particles=10, seed=42
     )
     state = game.new_initial_state()
 

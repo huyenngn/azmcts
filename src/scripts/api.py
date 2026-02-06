@@ -56,7 +56,7 @@ app.state.settings = ApiSettings(
     T=4, S=2, c_puct=1.5, dirichlet_alpha=0.0, dirichlet_weight=0.0
   ),
   sampler_cfg=config.SamplerConfig(
-    num_particles=24, max_matching_opp_actions=24, rebuild_max_tries=200
+    num_particles=120, max_matching_opp_actions=64, rebuild_max_tries=200
   ),
   model_path=DEFAULT_DEMO_MODEL_PATH,
 )
@@ -104,6 +104,7 @@ class GameStateResponse(pydantic.BaseModel):
 
 class ParticlesResponse(pydantic.BaseModel):
   observations: list[str] = []
+  total: int = 0
 
 
 def _ensure_model(path: pathlib.Path) -> str:
@@ -304,23 +305,21 @@ def step(request: MakeMoveRequest) -> GameStateResponse:
   return _response(infos)
 
 
-@app.get("/particles/{num_particles}")
+@app.get("/particles")
 def get_particles(num_particles: int) -> ParticlesResponse:
-  if app.state.particle is None:
+  if app.state.game is None or app.state.particle is None:
     raise fastapi.HTTPException(status_code=400, detail="No active game")
 
-  logger.info(
-    "Particle filter has %d particles", len(app.state.particle._particles)
-  )
+  total = len(app.state.particle._particles)
+  logger.info("Particle filter has %d particles", total)
 
   observations: list[str] = []
-  for p in app.state.particle._particles.values():
-    if len(observations) >= num_particles:
-      break
+  particles = app.state.particle.get_particles(num_particles)
+  for p in particles:
     obs = p.observation_string(app.state.human_id)
     observations.append(obs)
 
-  return ParticlesResponse(observations=observations)
+  return ParticlesResponse(observations=observations, total=total)
 
 
 def main() -> None:
@@ -339,8 +338,8 @@ def main() -> None:
   p.add_argument("--dirichlet-weight", type=float, default=0.0)
 
   # Particle sampler
-  p.add_argument("--num-particles", type=int, default=24)
-  p.add_argument("--max-matching-opp-actions", type=int, default=24)
+  p.add_argument("--num-particles", type=int, default=120)
+  p.add_argument("--max-matching-opp-actions", type=int, default=64)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
   # Model path for azbsmcts

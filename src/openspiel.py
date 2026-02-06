@@ -27,6 +27,11 @@ class Game:
     """Return the number of distinct actions."""
     return self._game.num_distinct_actions()
 
+  def deserialize_state(self, serialized_state: str) -> State:
+    """Deserialize a state from a string."""
+    deserialized_state = self._game.deserialize_state(serialized_state)
+    return State(deserialized_state)
+
 
 class State:
   """Wrapper around pyspiel.State with attempted action tracking."""
