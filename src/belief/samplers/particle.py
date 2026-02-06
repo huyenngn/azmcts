@@ -31,14 +31,14 @@ class ParticleDeterminizationSampler:
     self,
     game: openspiel.Game,
     ai_id: int,
-    min_particles: int = 32,
+    num_particles: int = 32,
     max_matching_opp_actions: int = 8,
     rebuild_max_tries: int = 200,
     seed: int = 0,
     opponent_policy: OpponentPolicy | None = None,
   ):
-    if min_particles <= 0:
-      raise ValueError("min_particles must be > 0")
+    if num_particles <= 0:
+      raise ValueError("num_particles must be > 0")
     if max_matching_opp_actions <= 0:
       raise ValueError("max_matching_opp_actions must be > 0")
     if rebuild_max_tries <= 0:
@@ -46,7 +46,7 @@ class ParticleDeterminizationSampler:
 
     self.game = game
     self.ai_id = ai_id
-    self.min_particles = min_particles
+    self.num_particles = num_particles
     self.max_matching_opp_actions = max_matching_opp_actions
     self.rebuild_max_tries = rebuild_max_tries
     self.rng = random.Random(seed)
@@ -148,6 +148,7 @@ class ParticleDeterminizationSampler:
       candidates.extend(self._matching_opponent_children(p, rec.ai_obs_after))
 
     self._particles = self._resample_unique_candidates(candidates)
+    self._downsample_particles_uniform()
 
   def _matching_opponent_children(
     self, particle: openspiel.State, target_obs: str
@@ -166,13 +167,8 @@ class ParticleDeterminizationSampler:
       return []
 
     matches: list[tuple[openspiel.State, float]] = []
-    seen: set[int] = set()
 
     for a, w in opp_actions_and_weights:
-      if a in seen:
-        continue
-      seen.add(a)
-
       p3 = p2.clone()
       p3.apply_action(a)
       if self._ai_obs(p3) != target_obs:
@@ -183,6 +179,14 @@ class ParticleDeterminizationSampler:
         break
 
     return matches
+
+  def _downsample_particles_uniform(self) -> None:
+    """Uniformly downsample current unique particles to num_particles (if needed)."""
+    if len(self._particles) <= self.num_particles:
+      return
+    keys = list(self._particles.keys())
+    keep = set(self.rng.sample(keys, self.num_particles))
+    self._particles = {k: self._particles[k] for k in keep}
 
   def _resample_unique_candidates(
     self, candidates: list[tuple[openspiel.State, float]]
@@ -216,8 +220,6 @@ class ParticleDeterminizationSampler:
       if attempt > 0 and attempt % 10 == 0:
         self.max_matching_opp_actions = min(base_k * 2, 64)
 
-      attempt_k = self.max_matching_opp_actions
-
       particles: dict[str, openspiel.State] = {}
       s0 = self.game.new_initial_state()
       particles[s0.serialize()] = s0
@@ -247,14 +249,10 @@ class ParticleDeterminizationSampler:
             )
           particles = self._resample_unique_candidates(candidates)
 
-        if len(particles) > self.min_particles:
-          self.max_matching_opp_actions = 1
-        else:
-          self.max_matching_opp_actions = attempt_k
-
       if ok and particles:
         self._particles = particles
         self.max_matching_opp_actions = base_k
+        self._downsample_particles_uniform()
         return
 
     # Rebuild failed.

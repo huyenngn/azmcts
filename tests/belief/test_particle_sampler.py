@@ -20,7 +20,7 @@ class TestParticleBeliefSampler:
     """Test default initialization."""
     sampler = samplers.ParticleDeterminizationSampler(game=game, ai_id=0)
     assert sampler.ai_id == 0
-    assert sampler.min_particles == 32
+    assert sampler.num_particles == 32
     assert sampler.opponent_policy is None
 
   def test_init_with_opponent_policy(self, game: openspiel.Game) -> None:
@@ -113,21 +113,22 @@ class TestParticleBeliefSampler:
   def test_step_builds_particles(self, game: openspiel.Game) -> None:
     """Test that step triggers particle building."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, min_particles=10, seed=42
+      game=game, ai_id=0, num_particles=10, max_matching_opp_actions=2, seed=42
     )
     state = game.new_initial_state()
 
-    # AI's first move
     state.apply_action(4)
     sampler.step(actor=0, action=4, real_state_after=state)
+    state.apply_action(0)
+    sampler.step(actor=1, action=0, real_state_after=state)  # Opponent's move
 
     # Should have built some particles
-    assert len(sampler._particles) > 0
+    assert len(sampler._particles) > 1
 
   def test_sample_returns_state(self, game: openspiel.Game) -> None:
     """Test that sample returns a valid state."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, min_particles=10, seed=42
+      game=game, ai_id=0, num_particles=10, seed=42
     )
 
     state = game.new_initial_state()
@@ -144,7 +145,7 @@ class TestParticleBeliefSampler:
   ) -> None:
     """Test fallback to cloning when no particles available."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, min_particles=10, seed=42
+      game=game, ai_id=0, num_particles=10, seed=42
     )
 
     # No history, should return initial state

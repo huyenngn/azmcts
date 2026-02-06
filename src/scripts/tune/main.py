@@ -55,7 +55,7 @@ def main() -> None:
     lr = trial.suggest_float("lr", 1e-4, 3e-3, log=True)
 
     # Belief sampler parameters
-    min_particles = trial.suggest_int("min_particles", 12, 36, log=True)
+    num_particles = trial.suggest_int("num_particles", 12, 36, log=True)
     max_matching_opp_actions = trial.suggest_int(
       "max_matching_opp_actions", 1, 8, log=True
     )
@@ -97,7 +97,7 @@ def main() -> None:
       dirichlet_weight=0.25,
     )
     sampler_cfg = config.SamplerConfig(
-      min_particles=min_particles,
+      num_particles=num_particles,
       max_matching_opp_actions=max_matching_opp_actions,
       rebuild_max_tries=200,
     )

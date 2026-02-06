@@ -92,7 +92,7 @@ uv run tune \
 | `S`                        | 4–6         | Belief samples (determinizations) |
 | `c_puct`                   | 0.5–3.0     | PUCT exploration constant         |
 | `lr`                       | 2e-4 – 3e-3 | Learning rate                     |
-| `min_particles`            | 10–48       | Belief state particles            |
+| `num_particles`            | 10–48       | Belief state particles            |
 | `max_matching_opp_actions` | 2–8         | Max opponent actions for matching |
 
 Each trial produces its own directory under `runs/`. Best trial summary is written to `runs/optuna_best.json`.
@@ -111,7 +111,7 @@ uv run train \
   --T 8 \
   --S 4 \
   --c-puct 1.0 \
-  --min-particles 16 \
+  --num-particles 16 \
   --max-matching-opp-actions 4 \
   --epochs 5 \
   --batch 64 \

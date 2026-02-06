@@ -306,7 +306,7 @@ def main() -> None:
     help="Cap replay buffer size (0 = unlimited)",
   )
 
-  p.add_argument("--min-particles", type=int, default=32)
+  p.add_argument("--num-particles", type=int, default=32)
   p.add_argument("--max-matching-opp-actions", type=int, default=8)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
@@ -327,7 +327,7 @@ def main() -> None:
     dirichlet_weight=args.dirichlet_weight,
   )
   sampler_cfg = config.SamplerConfig(
-    min_particles=args.min_particles,
+    num_particles=args.num_particles,
     max_matching_opp_actions=args.max_matching_opp_actions,
     rebuild_max_tries=args.rebuild_tries,
   )
