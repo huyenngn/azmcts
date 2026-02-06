@@ -20,7 +20,7 @@ class TestParticleBeliefSampler:
     """Test default initialization."""
     sampler = samplers.ParticleDeterminizationSampler(game=game, ai_id=0)
     assert sampler.ai_id == 0
-    assert sampler.num_particles == 32
+    assert sampler.min_particles == 32
     assert sampler.opponent_policy is None
 
   def test_init_with_opponent_policy(self, game: openspiel.Game) -> None:
@@ -42,9 +42,9 @@ class TestParticleBeliefSampler:
     state = game.new_initial_state()
 
     # Sample many actions and verify they're all legal
-    actions = sampler._get_opponent_actions(state)
+    actions = sampler._get_opponent_actions_and_weights(state)
     legal = state.legal_actions()
-    for a in actions:
+    for a, w in actions:
       assert a in legal
 
   def test_sample_opponent_action_with_policy(
@@ -69,8 +69,8 @@ class TestParticleBeliefSampler:
     # Sample many actions - should heavily favor action 4
     center_count = 0
     for _ in range(1000):
-      actions = sampler._get_opponent_actions(state)
-      if actions[0] == 4:
+      actions = sampler._get_opponent_actions_and_weights(state)
+      if actions[0][0] == 4:
         center_count += 1
 
     # With 99% probability, center should be chosen most of the time
@@ -90,7 +90,7 @@ class TestParticleBeliefSampler:
     state = game.new_initial_state()
 
     # Should fall back to uniform when all probs are zero
-    action = sampler._get_opponent_actions(state)[0]
+    action = sampler._get_opponent_actions_and_weights(state)[0][0]
     assert action in state.legal_actions()
 
   def test_reset_clears_state(self, game: openspiel.Game) -> None:
@@ -113,7 +113,7 @@ class TestParticleBeliefSampler:
   def test_step_builds_particles(self, game: openspiel.Game) -> None:
     """Test that step triggers particle building."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, num_particles=10, seed=42
+      game=game, ai_id=0, min_particles=10, seed=42
     )
     state = game.new_initial_state()
 
@@ -127,7 +127,7 @@ class TestParticleBeliefSampler:
   def test_sample_returns_state(self, game: openspiel.Game) -> None:
     """Test that sample returns a valid state."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, num_particles=10, seed=42
+      game=game, ai_id=0, min_particles=10, seed=42
     )
 
     state = game.new_initial_state()
@@ -144,7 +144,7 @@ class TestParticleBeliefSampler:
   ) -> None:
     """Test fallback to cloning when no particles available."""
     sampler = samplers.ParticleDeterminizationSampler(
-      game=game, ai_id=0, num_particles=10, seed=42
+      game=game, ai_id=0, min_particles=10, seed=42
     )
 
     # No history, should return initial state

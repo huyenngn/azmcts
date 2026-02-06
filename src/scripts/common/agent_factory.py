@@ -37,7 +37,7 @@ def make_belief_sampler(
   return samplers.ParticleDeterminizationSampler(
     game=game,
     ai_id=player_id,
-    num_particles=sampler_cfg.num_particles,
+    min_particles=sampler_cfg.min_particles,
     rebuild_max_tries=sampler_cfg.rebuild_max_tries,
     seed=seed,
     opponent_policy=opponent_policy,

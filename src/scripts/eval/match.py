@@ -186,7 +186,7 @@ def main() -> None:
   p.add_argument("--model", type=str, default=None)
   p.add_argument("--out-json", type=str, default="")
 
-  p.add_argument("--num-particles", type=int, default=32)
+  p.add_argument("--min-particles", type=int, default=32)
   p.add_argument("--max-matching-opp-actions", type=int, default=8)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
@@ -201,7 +201,7 @@ def main() -> None:
     dirichlet_weight=args.dirichlet_weight,
   )
   sampler_cfg = config.SamplerConfig(
-    args.num_particles, args.max_matching_opp_actions, args.rebuild_tries
+    args.min_particles, args.max_matching_opp_actions, args.rebuild_tries
   )
 
   game = openspiel.Game(game_cfg.name, game_cfg.params)
