@@ -9,9 +9,21 @@ import {
   type MakeMoveRequest,
   type PreviousMoveInfo,
   type StartGameRequest,
+  type ParticlesResponse,
 } from '@/lib/types'
-import { ChevronLeft, RotateCw } from 'lucide-vue-next'
+import { ChevronLeft, RotateCw, Brain } from 'lucide-vue-next'
 import MoveInfoHistory from '@/components/MoveInfoHistory.vue'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerFooter,
+  DrawerTrigger,
+  DrawerClose,
+} from '@/components/ui/drawer'
+import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
+import DrawerHeader from '@/components/ui/drawer/DrawerHeader.vue'
+import DrawerTitle from '@/components/ui/drawer/DrawerTitle.vue'
+import DrawerDescription from '@/components/ui/drawer/DrawerDescription.vue'
 
 const THINKING_DELAY = 300
 
@@ -25,6 +37,7 @@ const isTerminal = ref<boolean>(false)
 const returns = ref<number[]>([0.0, 0.0])
 const isLoading = ref<boolean>(false)
 const moveHistory = ref<string[]>([])
+const particles = ref<string[]>([])
 
 function parseBoard(observation: string): number[] {
   const rows = observation.matchAll(/\d\s([+OX]+)/g)
@@ -65,9 +78,7 @@ async function startGame() {
     isTerminal.value = response.data.is_terminal
     returns.value = response.data.returns
   } finally {
-    setTimeout(() => {
-      isLoading.value = false
-    }, THINKING_DELAY)
+    isLoading.value = false
   }
 }
 
@@ -95,6 +106,20 @@ async function handleMove(action: number) {
   }
 }
 
+async function fetchParticles() {
+  if (isLoading.value) return
+  isLoading.value = true
+  try {
+    const response = await axios.get<ParticlesResponse>('/particles/10')
+    particles.value = response.data.observations
+  } catch (error) {
+    console.error('Failed to fetch particles:', error)
+    particles.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
+
 onMounted(() => {
   startGame()
 })
@@ -104,7 +129,7 @@ onMounted(() => {
   <div class="grow flex items-stretch justify-center flex-col gap-4">
     <div class="flex items-center justify-between gap-4">
       <RouterLink to="/">
-        <Button variant="outline" size="icon"><ChevronLeft /></Button>
+        <Button variant="outline" size="icon" :disabled="isLoading"><ChevronLeft /></Button>
       </RouterLink>
       <span>{{
         isTerminal
@@ -117,7 +142,38 @@ onMounted(() => {
             ? 'AI is thinking...'
             : 'Your turn'
       }}</span>
-      <Button variant="outline" size="icon" @click="startGame"><RotateCw /></Button>
+      <div class="flex items-center gap-2">
+        <Button variant="outline" size="icon" @click="startGame" :disabled="isLoading"
+          ><RotateCw
+        /></Button>
+        <Drawer>
+          <DrawerTrigger as-child>
+            <Button variant="outline" size="icon" @click="fetchParticles" :disabled="isLoading"
+              ><Brain
+            /></Button>
+          </DrawerTrigger>
+          <DrawerContent>
+            <div class="mx-auto w-full max-w-3xl">
+              <DrawerHeader>
+                <DrawerTitle>Particle Filter Visualization</DrawerTitle>
+                <DrawerDescription
+                  >Visualize a subset of particles from the particle filter.</DrawerDescription
+                >
+              </DrawerHeader>
+              <ScrollArea class="h-96">
+                <div class="flex flex-wrap gap-10 justify-between">
+                  <GoBoard :board="parseBoard(p)" v-for="(p, index) in particles" :key="index" />
+                </div>
+              </ScrollArea>
+              <DrawerFooter>
+                <DrawerClose as-child>
+                  <Button variant="outline"> Close </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      </div>
     </div>
     <div
       :class="{ 'opacity-50 pointer-events-none': isLoading || isTerminal }"

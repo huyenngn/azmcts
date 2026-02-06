@@ -17,6 +17,7 @@ export default defineConfig({
     proxy: {
       '/start': 'http://localhost:8000',
       '/step': 'http://localhost:8000',
+      '/particles': 'http://localhost:8000',
     },
   },
 })

@@ -9,4 +9,6 @@ if t.TYPE_CHECKING:
 class DeterminizationSampler(t.Protocol):
   """Protocol for samplers that generate determinizations from belief states."""
 
+  _particles: dict[str, openspiel.State]
+
   def sample(self) -> openspiel.State: ...

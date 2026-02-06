@@ -56,7 +56,7 @@ app.state.settings = ApiSettings(
     T=4, S=2, c_puct=1.5, dirichlet_alpha=0.0, dirichlet_weight=0.0
   ),
   sampler_cfg=config.SamplerConfig(
-    num_particles=32, max_matching_opp_actions=8, rebuild_max_tries=200
+    num_particles=24, max_matching_opp_actions=24, rebuild_max_tries=200
   ),
   model_path=DEFAULT_DEMO_MODEL_PATH,
 )
@@ -100,6 +100,10 @@ class GameStateResponse(pydantic.BaseModel):
   previous_move_infos: list[PreviousMoveInfo] = []
   is_terminal: bool = False
   returns: list[float] = []
+
+
+class ParticlesResponse(pydantic.BaseModel):
+  observations: list[str] = []
 
 
 def _ensure_model(path: pathlib.Path) -> str:
@@ -298,6 +302,25 @@ def step(request: MakeMoveRequest) -> GameStateResponse:
     logger.info("Game ended: returns=%s", st.returns())
 
   return _response(infos)
+
+
+@app.get("/particles/{num_particles}")
+def get_particles(num_particles: int) -> ParticlesResponse:
+  if app.state.particle is None:
+    raise fastapi.HTTPException(status_code=400, detail="No active game")
+
+  logger.info(
+    "Particle filter has %d particles", len(app.state.particle._particles)
+  )
+
+  observations: list[str] = []
+  for p in app.state.particle._particles.values():
+    if len(observations) >= num_particles:
+      break
+    obs = p.observation_string(app.state.human_id)
+    observations.append(obs)
+
+  return ParticlesResponse(observations=observations)
 
 
 def main() -> None:
