@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 import random
 from collections import abc as cabc
 
@@ -32,7 +33,7 @@ class ParticleDeterminizationSampler:
     game: openspiel.Game,
     ai_id: int,
     num_particles: int = 32,
-    max_matching_opp_actions: int = 8,
+    max_matching_opp_actions: int = 24,
     rebuild_max_tries: int = 200,
     seed: int = 0,
     opponent_policy: OpponentPolicy | None = None,
@@ -191,7 +192,7 @@ class ParticleDeterminizationSampler:
   def _resample_unique_candidates(
     self, candidates: list[tuple[openspiel.State, float]]
   ) -> dict[str, openspiel.State]:
-    """Deduplicate candidates by serialize key."""
+    """Deduplicate candidates by serialize key, aggregate weights, then resample to num_particles."""
     if not candidates:
       return {}
 
@@ -204,7 +205,24 @@ class ParticleDeterminizationSampler:
       else:
         by_key[k] = (s, float(w))
 
-    return {k: st for k, (st, _) in by_key.items()}
+    items = list(by_key.items())
+    if len(items) <= self.num_particles:
+      return {k: st for k, (st, _) in items}
+
+    # Weighted sampling without replacement using Efraimidis–Spirakis keys:
+    # For weight w, sample key u^(1/w). Larger key => higher chance.
+    scored: list[tuple[float, str, openspiel.State]] = []
+    for k, (st, w) in items:
+      if not math.isfinite(w) or w <= 0.0:
+        w = 1e-12
+      u = self.rng.random()
+      u = max(u, 1e-12)
+      score = u ** (1.0 / w)
+      scored.append((score, k, st))
+
+    scored.sort(reverse=True, key=lambda x: x[0])
+    chosen = scored[: self.num_particles]
+    return {k: st for _, k, st in chosen}
 
   def _rebuild_particles(self) -> None:
     """Rebuild particles from scratch using the stored observation history."""
@@ -216,19 +234,25 @@ class ParticleDeterminizationSampler:
     base_k = self.max_matching_opp_actions
 
     for attempt in range(self.rebuild_max_tries):
-      # Mild escalation every few attempts if we're repeatedly failing.
-      if attempt > 0 and attempt % 10 == 0:
-        self.max_matching_opp_actions = min(base_k * 2, 64)
-
       particles: dict[str, openspiel.State] = {}
       s0 = self.game.new_initial_state()
       particles[s0.serialize()] = s0
 
+      # Mild excalation on later attempts to increase diversity if rebuild keeps failing.
+      attempt_max_opp_actions = min(
+        base_k + attempt, self.game.num_distinct_actions()
+      )
+
       ok = True
-      for rec in self._history:
+      for i, rec in enumerate(self._history):
         if not particles:
           ok = False
           break
+
+        # Aggressive decay as game progresses
+        self.max_matching_opp_actions = 1 + int(
+          attempt_max_opp_actions / ((i + 1) ** 2)
+        )
 
         if rec.actor_is_ai:
           updated: dict[str, openspiel.State] = {}

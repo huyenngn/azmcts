@@ -38,6 +38,7 @@ def make_belief_sampler(
     game=game,
     ai_id=player_id,
     num_particles=sampler_cfg.num_particles,
+    max_matching_opp_actions=sampler_cfg.max_matching_opp_actions,
     rebuild_max_tries=sampler_cfg.rebuild_max_tries,
     seed=seed,
     opponent_policy=opponent_policy,

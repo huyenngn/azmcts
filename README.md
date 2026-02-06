@@ -111,8 +111,8 @@ uv run train \
   --T 8 \
   --S 4 \
   --c-puct 1.0 \
-  --num-particles 16 \
-  --max-matching-opp-actions 4 \
+  --num-particles 24 \
+  --max-matching-opp-actions 24 \
   --epochs 5 \
   --batch 64 \
   --lr 1e-4 \
