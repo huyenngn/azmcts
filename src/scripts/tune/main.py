@@ -57,7 +57,7 @@ def main() -> None:
     # Belief sampler parameters
     num_particles = trial.suggest_int("num_particles", 12, 36, log=True)
     max_matching_opp_actions = trial.suggest_int(
-      "max_matching_opp_actions", 1, 8, log=True
+      "max_matching_opp_actions", 12, 36, log=True
     )
 
     ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

@@ -316,8 +316,8 @@ def main() -> None:
   p.add_argument("--dirichlet-weight", type=float, default=0.0)
 
   # Particle sampler
-  p.add_argument("--num-particles", type=int, default=32)
-  p.add_argument("--max-matching-opp-actions", type=int, default=8)
+  p.add_argument("--num-particles", type=int, default=24)
+  p.add_argument("--max-matching-opp-actions", type=int, default=24)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
   # Model path for azbsmcts

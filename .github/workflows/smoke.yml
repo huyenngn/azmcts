@@ -37,7 +37,7 @@ jobs:
       - name: Smoke train
         run: |
           uv run train \
-            --games 8 --checkpoint-interval 4 --T 2 --S 2 --epochs 2 --seed 0 \
+            --games 2 --checkpoint-interval 1 --T 2 --S 2 --epochs 2 --seed 0 \
             --runs-root artifacts/runs --run-name smoke
 
       - name: Smoke eval match

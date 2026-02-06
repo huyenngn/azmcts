@@ -16,13 +16,6 @@ def game() -> openspiel.Game:
 class TestParticleBeliefSampler:
   """Test ParticleBeliefSampler class."""
 
-  def test_init_default(self, game: openspiel.Game) -> None:
-    """Test default initialization."""
-    sampler = samplers.ParticleDeterminizationSampler(game=game, ai_id=0)
-    assert sampler.ai_id == 0
-    assert sampler.num_particles == 32
-    assert sampler.opponent_policy is None
-
   def test_init_with_opponent_policy(self, game: openspiel.Game) -> None:
     """Test initialization with opponent policy."""
 

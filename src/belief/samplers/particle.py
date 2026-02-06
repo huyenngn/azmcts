@@ -32,7 +32,7 @@ class ParticleDeterminizationSampler:
     self,
     game: openspiel.Game,
     ai_id: int,
-    num_particles: int = 32,
+    num_particles: int = 24,
     max_matching_opp_actions: int = 24,
     rebuild_max_tries: int = 200,
     seed: int = 0,

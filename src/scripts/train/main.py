@@ -306,8 +306,8 @@ def main() -> None:
     help="Cap replay buffer size (0 = unlimited)",
   )
 
-  p.add_argument("--num-particles", type=int, default=32)
-  p.add_argument("--max-matching-opp-actions", type=int, default=8)
+  p.add_argument("--num-particles", type=int, default=24)
+  p.add_argument("--max-matching-opp-actions", type=int, default=24)
   p.add_argument("--rebuild-tries", type=int, default=200)
 
   args = p.parse_args()
