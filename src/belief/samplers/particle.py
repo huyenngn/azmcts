@@ -16,6 +16,12 @@ OpponentPolicy = cabc.Callable[[openspiel.State], np.ndarray]
 logger = logging.getLogger(__name__)
 
 INITIAL_STATE_SERIALIZED = "\n"
+MAX_TEMP = 2.0
+TEMP_ESCALATION_FACTOR = 1.2
+NUM_PARTICLES_INITIAL_FRACTION = 0.7
+MATCHES_PER_PARTICLE_INITIAL_FRACTION = 0.7
+NUM_PARTICLES_ESCALATION_FACTOR = 1.1
+MATCHES_PER_PARTICLE_ESCALATION_FACTOR = 1.1
 
 
 @dataclasses.dataclass(frozen=True)
@@ -228,8 +234,12 @@ class ParticleDeterminizationSampler:
       f"Rebuilding particles with history of {len(self._history)} steps and {len(self._particles)} existing particles."
     )
 
-    num_particles = int(self.max_num_particles * 0.7)
-    matches_per_particle = self.game.num_distinct_actions() // 2
+    num_particles = int(
+      self.max_num_particles * NUM_PARTICLES_INITIAL_FRACTION
+    )
+    matches_per_particle = int(
+      self.game.num_distinct_actions() * MATCHES_PER_PARTICLE_INITIAL_FRACTION
+    )
     temperature = self.temperature
 
     for attempt in range(self.rebuild_tries):
@@ -240,13 +250,16 @@ class ParticleDeterminizationSampler:
       particles: list[str] = [self.game.new_initial_state().serialize()]
 
       # Mild escalation on later attempts to increase diversity if rebuild keeps failing.
-      num_particles = min(num_particles + 10, self.max_num_particles)
+      num_particles = min(
+        int(num_particles * NUM_PARTICLES_ESCALATION_FACTOR),
+        self.max_num_particles,
+      )
       matches_per_particle = min(
-        matches_per_particle + 10,
+        int(matches_per_particle * MATCHES_PER_PARTICLE_ESCALATION_FACTOR),
         self.game.num_distinct_actions(),
         self.max_matches_per_particle,
       )
-      temperature = min(temperature + 0.2, 2.0)
+      temperature = min(temperature * TEMP_ESCALATION_FACTOR, MAX_TEMP)
 
       ok = True
       for rec in self._history:

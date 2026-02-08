@@ -265,7 +265,11 @@ def main() -> None:
   p.add_argument("--deterministic-torch", action="store_true")
 
   p.add_argument("--game", type=str, default="phantom_go")
-  p.add_argument("--game-params", type=str, default='{"board_size": 9}')
+  p.add_argument(
+    "--game-params",
+    type=str,
+    default='{"board_size": 9, "max_game_length": 162}',
+  )
 
   p.add_argument("--games", type=int, default=50)
   p.add_argument(

@@ -12,7 +12,7 @@ const props = defineProps<{
     <TransitionGroup name="move-info" tag="div" class="flex flex-col-reverse">
       <div v-for="(info, index) in props.previousMoveInfos" :key="`${index}`" class="move-item">
         <div class="py-2">
-          {{ info }}
+          <span class="text-muted-foreground">{{ index + 1 }}.</span> {{ info }}
         </div>
         <Separator v-if="index !== 0" />
       </div>

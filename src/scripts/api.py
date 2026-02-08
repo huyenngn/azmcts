@@ -294,7 +294,7 @@ def step(request: MakeMoveRequest) -> GameStateResponse:
 
 
 @app.get("/particles")
-def get_particles(max_num_particles: int) -> ParticlesResponse:
+def get_particles(num_particles: int) -> ParticlesResponse:
   if app.state.game is None or app.state.particle is None:
     raise fastapi.HTTPException(status_code=400, detail="No active game")
 
@@ -302,7 +302,7 @@ def get_particles(max_num_particles: int) -> ParticlesResponse:
   logger.info("Particle filter has %d particles", total)
 
   observations: list[str] = []
-  particles = app.state.particle.sample_unique_particles(max_num_particles)
+  particles = app.state.particle.sample_unique_particles(num_particles)
   for p in particles:
     obs = p.observation_string(app.state.human_id)
     observations.append(obs)

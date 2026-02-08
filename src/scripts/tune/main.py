@@ -21,7 +21,11 @@ def main() -> None:
   parser.add_argument("--seed", type=int, default=0)
   parser.add_argument("--device", type=str, default="cpu")
   parser.add_argument("--game", type=str, default="phantom_go")
-  parser.add_argument("--game-params", type=str, default='{"board_size": 9}')
+  parser.add_argument(
+    "--game-params",
+    type=str,
+    default='{"board_size": 9, "max_game_length": 162}',
+  )
 
   parser.add_argument("--games", type=int, default=30)
   parser.add_argument("--epochs", type=int, default=2)

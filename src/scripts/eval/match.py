@@ -20,18 +20,24 @@ class Result:
   draws: int = 0
   p0_return_sum: float = 0.0
   p1_return_sum: float = 0.0
+  win_lengths: list[int] = dataclasses.field(default_factory=list)
+  loss_lengths: list[int] = dataclasses.field(default_factory=list)
+  draw_lengths: list[int] = dataclasses.field(default_factory=list)
 
 
-def update_result(res: Result, r0: float, r1: float) -> None:
+def update_result(res: Result, r0: float, r1: float, game_length: int) -> None:
   res.games += 1
   res.p0_return_sum += r0
   res.p1_return_sum += r1
   if r0 > r1:
     res.p0_wins += 1
+    res.win_lengths.append(game_length)
   elif r1 > r0:
     res.p1_wins += 1
+    res.loss_lengths.append(game_length)
   else:
     res.draws += 1
+    res.draw_lengths.append(game_length)
 
 
 def play_game(
@@ -46,7 +52,7 @@ def play_game(
   model_path: str | None,
   run_id: str,
   game_idx: int,
-) -> tuple[float, float]:
+) -> tuple[float, float, int]:
   rng = random.Random(
     seeding.derive_seed(
       seed, purpose="eval/rng", run_id=run_id, game_idx=game_idx
@@ -97,7 +103,8 @@ def play_game(
       p1.step(actor=actor, action=action, real_state_after=state)
 
   r = state.returns()
-  return float(r[0]), float(r[1])
+  game_length = state.game_length()
+  return float(r[0]), float(r[1]), game_length
 
 
 def run_match(
@@ -117,7 +124,7 @@ def run_match(
 
   res_ab = Result()
   for i in range(n):
-    r0, r1 = play_game(
+    r0, r1, game_length = play_game(
       game=game,
       kind0=a,
       kind1=b,
@@ -129,12 +136,12 @@ def run_match(
       run_id=run_id,
       game_idx=i,
     )
-    update_result(res_ab, r0, r1)
+    update_result(res_ab, r0, r1, game_length)
   out[f"{a}(p0) vs {b}(p1)"] = res_ab
 
   res_ba = Result()
   for i in range(n):
-    r0, r1 = play_game(
+    r0, r1, game_length = play_game(
       game=game,
       kind0=b,
       kind1=a,
@@ -146,7 +153,7 @@ def run_match(
       run_id=run_id,
       game_idx=10_000 + i,
     )
-    update_result(res_ba, r0, r1)
+    update_result(res_ba, r0, r1, game_length)
   out[f"{b}(p0) vs {a}(p1)"] = res_ba
 
   return out

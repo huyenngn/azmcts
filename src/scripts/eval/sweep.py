@@ -4,6 +4,8 @@ import argparse
 import datetime
 import pathlib
 
+import numpy as np
+
 import openspiel
 from scripts.common import config, io, seeding
 from scripts.eval import match
@@ -21,6 +23,37 @@ def az_winrate(res: dict, az_label: str = "azbsmcts") -> float:
   )
   total = r1.games + r2.games
   return az_wins / max(1, total)
+
+
+def extract_az_game_lengths(
+  res: dict, az_label: str = "azbsmcts"
+) -> tuple[list[int], list[int], list[int]]:
+  """Extract win/loss/draw game lengths from AZ perspective.
+
+  Returns:
+      (win_lengths, loss_lengths, draw_lengths)
+  """
+  items = list(res.items())
+  r1 = items[0][1]
+  r2 = items[1][1]
+
+  if az_label in items[0][0]:
+    # AZ is p0 in r1, p1 in r2
+    win_lengths = r1.win_lengths + r2.loss_lengths
+    loss_lengths = r1.loss_lengths + r2.win_lengths
+    draw_lengths = r1.draw_lengths + r2.draw_lengths
+  else:
+    # AZ is p1 in r1, p0 in r2
+    win_lengths = r1.loss_lengths + r2.win_lengths
+    loss_lengths = r1.win_lengths + r2.loss_lengths
+    draw_lengths = r1.draw_lengths + r2.draw_lengths
+
+  return win_lengths, loss_lengths, draw_lengths
+
+
+def mean_or_nan(values: list[int]) -> float:
+  """Compute mean of list or NaN if empty."""
+  return float(np.mean(values)) if values else float("nan")
 
 
 def find_checkpoints(run_dir: pathlib.Path) -> list[pathlib.Path]:
@@ -156,6 +189,7 @@ def main() -> None:
       run_id=f"sweep_{sweep_id}_{ckpt_id}",
     )
     wr_b = az_winrate(res_b)
+    win_b, loss_b, draw_b = extract_az_game_lengths(res_b)
 
     # Evaluate vs random
     random_seed = seeding.derive_seed(
@@ -174,6 +208,7 @@ def main() -> None:
       run_id=f"sweep_{sweep_id}_{ckpt_id}_random",
     )
     wr_r = az_winrate(res_r)
+    win_r, loss_r, draw_r = extract_az_game_lengths(res_r)
 
     row = {
       "checkpoint": ckpt_path.name,
@@ -181,6 +216,12 @@ def main() -> None:
       "x_games": float(x_games) if x_games else float("nan"),
       "wr_vs_bsmcts": float(wr_b),
       "wr_vs_random": float(wr_r),
+      "mean_win_len_vs_bsmcts": mean_or_nan(win_b),
+      "mean_loss_len_vs_bsmcts": mean_or_nan(loss_b),
+      "mean_draw_len_vs_bsmcts": mean_or_nan(draw_b),
+      "mean_win_len_vs_random": mean_or_nan(win_r),
+      "mean_loss_len_vs_random": mean_or_nan(loss_r),
+      "mean_draw_len_vs_random": mean_or_nan(draw_r),
     }
     rows.append(row)
     print(
