@@ -32,6 +32,10 @@ class Game:
     deserialized_state = self._game.deserialize_state(serialized_state)
     return State(deserialized_state)
 
+  def max_game_length(self) -> int:
+    """Return the maximum length of the game."""
+    return self._game.max_game_length()
+
 
 class State:
   """Wrapper around pyspiel.State with attempted action tracking."""

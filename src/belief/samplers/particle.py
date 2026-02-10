@@ -16,12 +16,9 @@ OpponentPolicy = cabc.Callable[[openspiel.State], np.ndarray]
 logger = logging.getLogger(__name__)
 
 INITIAL_STATE_SERIALIZED = "\n"
-MAX_TEMP = 2.0
-TEMP_ESCALATION_FACTOR = 1.2
+
 NUM_PARTICLES_INITIAL_FRACTION = 0.7
 MATCHES_PER_PARTICLE_INITIAL_FRACTION = 0.7
-NUM_PARTICLES_ESCALATION_FACTOR = 1.1
-MATCHES_PER_PARTICLE_ESCALATION_FACTOR = 1.1
 REBUILD_THRESHOLD_FRACTION = 0.2
 
 
@@ -32,6 +29,7 @@ class _StepRecord:
   actor_is_ai: bool
   ai_action: int | None
   ai_obs_after: bytes
+  checkpoint_particles: list[str]
 
 
 class ParticleDeterminizationSampler:
@@ -43,6 +41,7 @@ class ParticleDeterminizationSampler:
     ai_id: int,
     max_num_particles: int = 150,
     max_matches_per_particle: int = 100,
+    checkpoint_interval: int = 5,
     rebuild_tries: int = 50,
     seed: int = 0,
     opponent_policy: OpponentPolicy | None = None,
@@ -52,13 +51,18 @@ class ParticleDeterminizationSampler:
       raise ValueError("max_num_particles must be > 0")
     if max_matches_per_particle <= 0:
       raise ValueError("max_matches_per_particle must be > 0")
+    if checkpoint_interval <= 0:
+      raise ValueError("checkpoint_interval must be > 0")
     if rebuild_tries <= 0:
       raise ValueError("rebuild_tries must be > 0")
 
     self.game = game
     self.ai_id = ai_id
     self.max_num_particles = max_num_particles
-    self.max_matches_per_particle = max_matches_per_particle
+    self.max_matches_per_particle = min(
+      max_matches_per_particle, game.num_distinct_actions()
+    )
+    self.checkpoint_interval = checkpoint_interval
     self.rebuild_tries = rebuild_tries
     self.rng = random.Random(seed)
     self.opponent_policy = opponent_policy
@@ -91,14 +95,20 @@ class ParticleDeterminizationSampler:
     actor/action describe the real move taken in the environment.
     real_state_after is used ONLY to extract the AI observation (non-cheating).
     """
+    checkpoint_particles: list[str] = []
+    if (len(self._history) + 1) % self.checkpoint_interval == 0:
+      checkpoint_particles = self._particles
+
     rec = _StepRecord(
       actor_is_ai=(actor == self.ai_id),
       ai_action=(action if actor == self.ai_id else None),
       ai_obs_after=self._ai_obs(real_state_after),
+      checkpoint_particles=checkpoint_particles,
     )
     self._history.append(rec)
 
-    self._rebuild_particles_if_needed(threshold=0)
+    if not self._particles:
+      self._rebuild_particles()
 
     if rec.actor_is_ai:
       self._particles = self._resample_particles_for_ai(rec)
@@ -110,7 +120,8 @@ class ParticleDeterminizationSampler:
     if not self._history:
       return INITIAL_STATE_SERIALIZED
 
-    self._rebuild_particles_if_needed()
+    if not self._particles:
+      self._rebuild_particles()
 
     if not self._particles:
       logger.warning(
@@ -222,12 +233,6 @@ class ParticleDeterminizationSampler:
       k=num_particles,
     )
 
-  def _rebuild_particles_if_needed(self, threshold: int | None = None) -> None:
-    if threshold is None:
-      threshold = int(self.max_num_particles * REBUILD_THRESHOLD_FRACTION)
-    if len(self._particles) <= threshold:
-      self._rebuild_particles()
-
   def _rebuild_particles(self) -> None:
     """Rebuild particles using the stored observation history."""
     if not self._history:
@@ -246,27 +251,48 @@ class ParticleDeterminizationSampler:
     )
     temperature = self.temperature
 
-    for attempt in range(self.rebuild_tries):
-      logger.debug(
-        f"Rebuild attempt {attempt + 1}/{self.rebuild_tries} with max_num_particles={num_particles} "
-        f"max_matches_per_particle={matches_per_particle} and temperature={temperature:.2f}"
-      )
-      particles: list[str] = [self.game.new_initial_state().serialize()]
+    latest_checkpoint_n = (len(self._history) - 1) // self.checkpoint_interval
+    latest_checkpoint_idx = (latest_checkpoint_n) * self.checkpoint_interval
+    checkpoint_step = 1 + latest_checkpoint_n // self.rebuild_tries
 
-      # Mild escalation on later attempts to increase diversity if rebuild keeps failing.
+    for attempt in range(self.rebuild_tries):
+      checkpoint_idx = (
+        latest_checkpoint_idx
+        - (attempt * checkpoint_step) * self.checkpoint_interval
+      )
+      particles = [INITIAL_STATE_SERIALIZED]
+      start_idx = 0
+      if checkpoint_idx > 0:
+        checkpoint_particles = self._history[
+          checkpoint_idx - 1
+        ].checkpoint_particles
+        if checkpoint_particles:
+          particles = checkpoint_particles
+          start_idx = checkpoint_idx - 1
+      logger.debug(
+        f"Rebuild attempt {attempt + 1}/{self.rebuild_tries} starting from checkpoint index {checkpoint_idx} with {len(particles)} particles."
+      )
+      history_scale = (
+        1.0 + (len(self._history) - start_idx) / self.game.max_game_length()
+      )
       num_particles = min(
-        int(num_particles * NUM_PARTICLES_ESCALATION_FACTOR),
+        int(num_particles * history_scale),
         self.max_num_particles,
       )
       matches_per_particle = min(
-        int(matches_per_particle * MATCHES_PER_PARTICLE_ESCALATION_FACTOR),
-        self.game.num_distinct_actions(),
+        int(matches_per_particle * history_scale),
         self.max_matches_per_particle,
       )
-      temperature = min(temperature * TEMP_ESCALATION_FACTOR, MAX_TEMP)
+      temperature = temperature * history_scale
+
+      logger.debug(
+        f"Rebuilding with num_particles={num_particles} "
+        f"matches_per_particle={matches_per_particle} and temperature={temperature:.2f}"
+      )
 
       ok = True
-      for rec in self._history:
+      for idx in range(start_idx, len(self._history)):
+        rec = self._history[idx]
         if not particles:
           ok = False
           break

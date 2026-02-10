@@ -41,7 +41,7 @@ def main() -> None:
 
   parser.add_argument("--max-num-particles", type=int, default=150)
   parser.add_argument("--max-matches-per-particle", type=int, default=100)
-  parser.add_argument("--rebuild-tries", type=int, default=30)
+  parser.add_argument("--rebuild-tries", type=int, default=10)
   args = parser.parse_args()
 
   utils.ensure_dir(pathlib.Path("runs"))

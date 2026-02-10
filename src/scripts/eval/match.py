@@ -195,7 +195,7 @@ def main() -> None:
 
   p.add_argument("--max-num-particles", type=int, default=150)
   p.add_argument("--max-matches-per-particle", type=int, default=100)
-  p.add_argument("--rebuild-tries", type=int, default=30)
+  p.add_argument("--rebuild-tries", type=int, default=10)
 
   args = p.parse_args()
 
