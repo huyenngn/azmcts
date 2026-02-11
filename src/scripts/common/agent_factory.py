@@ -96,16 +96,27 @@ def make_agent(
     def make_opponent_policy(
       network: nets.TinyPolicyValueNet, dev: str
     ) -> samplers.OpponentPolicy:
-      def policy_fn(state: openspiel.State) -> np.ndarray:
+      def policy_fn(states: list[openspiel.State]) -> list[np.ndarray]:
         import torch
 
-        side = state.current_player()
-        obs = np.asarray(state.observation_tensor(side), dtype=np.float32)
-        obs_t = torch.from_numpy(obs).unsqueeze(0).to(dev)
+        if not states:
+          return []
+
+        # Build batched observation tensor
+        obs_list = []
+        for state in states:
+          side = state.current_player()
+          obs = np.asarray(state.observation_tensor(side), dtype=np.float32)
+          obs_list.append(obs)
+
+        obs_batch = np.stack(obs_list, axis=0)
+        obs_t = torch.from_numpy(obs_batch).to(dev)
+
         with torch.no_grad():
-          logits, _ = network(obs_t)
-        logits_np = logits.squeeze(0).cpu().numpy()
-        return softmax.softmax_np(logits_np)
+          logits_batch, _ = network(obs_t)
+        logits_np = logits_batch.cpu().numpy()
+
+        return [softmax.softmax_np(logits_np[i]) for i in range(len(states))]
 
       return policy_fn
 

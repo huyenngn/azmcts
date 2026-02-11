@@ -95,7 +95,7 @@ class GameStateResponse(pydantic.BaseModel):
 
 class ParticlesResponse(pydantic.BaseModel):
   observations: list[str] = []
-  total: int = 0
+  diversity: float = 0.0
 
 
 def _sse_event(event: str, data: dict[str, t.Any]) -> str:
@@ -333,8 +333,8 @@ def get_particles(num_particles: int) -> ParticlesResponse:
   if app.state.game is None or app.state.particle is None:
     raise fastapi.HTTPException(status_code=400, detail="No active game")
 
-  total = len(app.state.particle._particles)
-  logger.info("Particle filter has %d particles", total)
+  diversity = app.state.particle._get_particle_diversity()
+  logger.info(f"Particle filter has {diversity:.1%} diversity")
 
   observations: list[str] = []
   particles = app.state.particle.sample_unique_particles(num_particles)
@@ -342,7 +342,7 @@ def get_particles(num_particles: int) -> ParticlesResponse:
     obs = p.observation_string(app.state.human_id)
     observations.append(obs)
 
-  return ParticlesResponse(observations=observations, total=total)
+  return ParticlesResponse(observations=observations, diversity=diversity)
 
 
 def main() -> None:
@@ -363,7 +363,7 @@ def main() -> None:
   # Particle sampler
   p.add_argument("--max-num-particles", type=int, default=150)
   p.add_argument("--max-matches-per-particle", type=int, default=100)
-  p.add_argument("--rebuild-tries", type=int, default=10)
+  p.add_argument("--rebuild-tries", type=int, default=5)
 
   # Model path for azbsmcts
   p.add_argument(

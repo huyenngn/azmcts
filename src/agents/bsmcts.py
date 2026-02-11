@@ -26,6 +26,7 @@ class BSMCTSAgent(agents.BaseAgent):
     T: int = 64,
     S: int = 8,
     seed: int = 0,
+    length_discount: float = 0.999,
   ):
     super().__init__(game=game, player_id=player_id, seed=seed)
     self.tree = tree.BeliefTree()
@@ -33,6 +34,7 @@ class BSMCTSAgent(agents.BaseAgent):
     self.c_uct = float(c_uct)
     self.T = int(T)
     self.S = int(S)
+    self.length_discount = float(length_discount)
 
   def select_action(self, state: openspiel.State) -> int:
     """Select the best action via MCTS over sampled determinizations."""
@@ -73,13 +75,19 @@ class BSMCTSAgent(agents.BaseAgent):
       steps += 1
 
     if state.is_terminal():
-      return float(state.returns()[self.player_id])
+      # Apply length discount to discourage stalling
+      return float(state.returns()[self.player_id]) * (
+        self.length_discount ** state.game_length()
+      )
     return 0.0
 
   def _search(self, state: openspiel.State) -> float:
     """Recursive MCTS search with UCT selection."""
     if state.is_terminal():
-      return float(state.returns()[self.player_id])
+      # Apply length discount to discourage stalling
+      return float(state.returns()[self.player_id]) * (
+        self.length_discount ** state.game_length()
+      )
 
     node = self.tree.get_or_create(
       self.obs_key(state, self.player_id), state.current_player()

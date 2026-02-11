@@ -14,6 +14,7 @@ class Game:
     self._game: pyspiel.Game = pyspiel.load_game(
       name, params if params is not None else {}
     )
+    self.name = self._game.get_type().short_name
 
   def new_initial_state(self) -> State:
     """Create a new initial game state."""

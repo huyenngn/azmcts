@@ -19,8 +19,8 @@ class TestParticleBeliefSampler:
   def test_init_with_opponent_policy(self, game: openspiel.Game) -> None:
     """Test initialization with opponent policy."""
 
-    def dummy_policy(state: openspiel.State) -> np.ndarray:
-      return np.ones(9) / 9
+    def dummy_policy(states: list[openspiel.State]) -> list[np.ndarray]:
+      return [np.ones(9) / 9 for _ in states]
 
     sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=dummy_policy
@@ -34,7 +34,9 @@ class TestParticleBeliefSampler:
     )
     state = game.new_initial_state()
 
-    probs = sampler._get_opponent_action_weights(state)
+    probs_list = sampler._get_opponent_action_weights([state])
+    assert len(probs_list) == 1
+    probs = probs_list[0]
     assert len(probs) == len(state.legal_actions())
     assert np.allclose(probs, 1 / len(state.legal_actions()))
 
@@ -44,13 +46,16 @@ class TestParticleBeliefSampler:
     """Test opponent action sampling uses policy distribution."""
 
     # Policy that strongly prefers action 4 (center)
-    def biased_policy(state: openspiel.State) -> np.ndarray:
-      probs = np.zeros(9)
-      probs[4] = 0.99
-      for a in state.legal_actions():
-        if a != 4:
-          probs[a] = 0.001
-      return probs
+    def biased_policy(states: list[openspiel.State]) -> list[np.ndarray]:
+      results = []
+      for state in states:
+        probs = np.zeros(9)
+        probs[4] = 0.99
+        for a in state.legal_actions():
+          if a != 4:
+            probs[a] = 0.001
+        results.append(probs)
+      return results
 
     sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=biased_policy, seed=42
@@ -60,7 +65,8 @@ class TestParticleBeliefSampler:
     # Sample many actions - should heavily favor action 4
     center_count = 0
     for _ in range(1000):
-      probs = sampler._get_opponent_action_weights(state)
+      probs_list = sampler._get_opponent_action_weights([state])
+      probs = probs_list[0]
       if np.argmax(probs) == 4:
         center_count += 1
 
@@ -72,8 +78,8 @@ class TestParticleBeliefSampler:
   ) -> None:
     """Test that zero probabilities are handled gracefully."""
 
-    def zero_policy(state: openspiel.State) -> np.ndarray:
-      return np.zeros(9)
+    def zero_policy(states: list[openspiel.State]) -> list[np.ndarray]:
+      return [np.zeros(9) for _ in states]
 
     sampler = samplers.ParticleDeterminizationSampler(
       game=game, ai_id=0, opponent_policy=zero_policy, seed=42
@@ -81,7 +87,8 @@ class TestParticleBeliefSampler:
     state = game.new_initial_state()
 
     # Should fall back to uniform when all probs are zero
-    probs = sampler._get_opponent_action_weights(state)
+    probs_list = sampler._get_opponent_action_weights([state])
+    probs = probs_list[0]
     assert len(probs) == len(state.legal_actions())
     assert np.allclose(probs, 1e-12)
 
@@ -114,7 +121,8 @@ class TestParticleBeliefSampler:
     state.apply_action(0)
     sampler.step(actor=1, action=0, real_state_after=state)  # Opponent's move
 
-    # Should have built some particles
+    # Particles are built lazily on sample(), not during step()
+    sampler.sample()
     assert len(sampler._particles) > 1
 
   def test_sample_returns_state(self, game: openspiel.Game) -> None:

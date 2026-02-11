@@ -12,7 +12,7 @@ import {
 import { PlayerColor } from '@/lib/types'
 
 const playerId = ref(PlayerColor.Black)
-const opponentAi = ref('random')
+const opponentAi = ref('azbsmcts')
 </script>
 
 <template>

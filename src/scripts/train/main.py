@@ -14,8 +14,6 @@ import openspiel
 from scripts.common import agent_factory, config, io, seeding
 from utils import utils
 
-LENGTH_DISCOUNT = 0.999
-
 
 def obs_tensor_side_to_move(state: openspiel.State) -> np.ndarray:
   return np.asarray(
@@ -102,13 +100,7 @@ def self_play_one_game(
     p1.step(actor=actor, action=action, real_state_after=state)
 
   rets = state.returns()
-  num_moves = len(traj)
-  examples = []
-  for i, (obs, pi, p) in enumerate(traj):
-    # Discount based on remaining moves from this position
-    moves_remaining = num_moves - i
-    discounted_z = float(rets[p]) * (LENGTH_DISCOUNT**moves_remaining)
-    examples.append(Example(obs=obs, pi=pi, z=discounted_z))
+  examples = [Example(obs=obs, pi=pi, z=float(rets[p])) for obs, pi, p in traj]
 
   return examples, float(rets[0])
 
